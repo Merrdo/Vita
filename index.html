@@ -101,12 +101,19 @@ html,body{height:var(--full-h,100%);min-height:100%;margin:0;background:#050609;
 <div id="ttl"><b>VITA</b><i id="sub">kat 1</i></div>
 <div class="row"><div class="bt" id="ps">duraklat</div><div class="bt" id="nf" style="display:none">yeni kat</div></div>
 <div id="pause"><h2>DURAKLADI</h2><b>DOKUN, DEVAM ET</b></div>
-<div id="start"><h1>VITA</h1><p>Sol: sürükle, yürü<br>Sağ: basılı tut, ateş et · sürükle, yönünü çevir</p><b>DOKUN, BAŞLA</b><span id="dvt"></span></div>
+<div id="start"><h1>VITA</h1><p>Sol: yürü<br>Sağ: sürükle, nişan al · en dış kenara it, ateş et</p><b>DOKUN, BAŞLA</b><span id="dvt"></span></div>
 <script>
 (function(){
-var cv=document.getElementById('c'),cx=cv.getContext('2d'),hv=document.getElementById('h'),hx=hv.getContext('2d'),W,H,S,DPR=1,HP=1,HD=10;
+var cv=document.getElementById('c'),cx=cv.getContext('2d'),hv=document.getElementById('h'),hx=hv.getContext('2d'),W,H,S,DPR=1,HP=1,HD=10,
+  /* ===== TEK YERDEN AYAR =====
+     ZOOM  = ekran yüksekliğine sığan kare sayısı (küçük = daha yakın, alt sınır ~6.5)
+     SIGHT = ileri görüş uzaklığı (kare)
+     SIDE  = yanlardaki/arkadaki görüş uzaklığı (kare)
+     FOV   = tam görüş konisinin açısı (radyan)
+     RANGE = mermi menzili (kare; görüşten biraz uzun tutulur) */
+  ZOOM=7,SIGHT=8,SIDE=2,FOV=2,RANGE=11,VR=SIGHT,VN=SIDE;
 function rs(){DPR=Math.min(2,window.devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);cx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
-  HP=Math.min(3,Math.max(1,window.devicePixelRatio||1));hv.width=Math.round(W*HP);hv.height=Math.round(H*HP);hx.setTransform(hv.width/W,0,0,hv.height/H,0,0);S=Math.max(34,Math.min(W,H)/8.5);HD=Math.hypot(W,H)/S/2+1}
+  HP=Math.min(3,Math.max(1,window.devicePixelRatio||1));hv.width=Math.round(W*HP);hv.height=Math.round(H*HP);hx.setTransform(hv.width/W,0,0,hv.height/H,0,0);S=Math.max(34,Math.min(W,H)/ZOOM);HD=Math.hypot(W,H)/S/2+1}
 window.addEventListener('resize',rs);window.addEventListener('orientationchange',function(){[60,300,900].forEach(function(t){setTimeout(rs,t)})});rs();if(window.ResizeObserver){try{new ResizeObserver(rs).observe(cv)}catch(_){}}
 var $=function(i){return document.getElementById(i)},PI=Math.PI,R=Math.random;
 var MW=44,MH=44,seen=new Uint8Array(44*44),rv=new Float32Array(44*44),sa=new Float32Array(44*44),fgC=null,fgD=1,rvl=[],ROOMREV=true,mmx=0,mmy=0,mms=0,mmS=0,fdt=0,ex=0,ey=0,exI=0,fT=0,seenT=0,mkP=null,HINT_AFTER=60,MEMA=.045,MEML=.2,map,rooms,cors,lamps,rid,fl=1,cam={x:22,y:22},vl={x:0,y:0},T=0,lit=true,fade=0,fs=0,last=0,drag=null,keys={},BL='188,210,255',OR='255,138,92',WH='244,242,238';
@@ -195,29 +202,37 @@ step:function(dt){if(!this.on)return;var c=this.c,t=c.currentTime,i,L,d,b=1e9,bl
   this.hg.gain.setTargetAtTime(bl?.011*Math.max(0,1-b/9):0,t,.25);if(this.hpn)this.hpn.pan.setTargetAtTime(bl?Math.max(-1,Math.min(1,(bl.x-cam.x)/5)):0,t,.25)}};
 /* ---------- giriş ---------- */
 /* Kontrol: sol yarıda hareket joystiği (parmağın bastığı yerde açılır, sürükledikçe yürür). Ateş / nişan yok; bakış yönü yürüyüş yönünü izler. Klavye: WASD / ok tuşları. */
-/* İki joystick: SOL = yürü, SAĞ = bak + ateş. Her biri parmağın bastığı yerde açılır; parmak çemberin dışına çıkarsa taban onu izler.
-   Sağ joystick basılı tutulduğu sürece karakter ateş eder (nişan modu yok); sürükleme bakış yönünü belirler.
+/* İki SABİT joystick, sağ el baskın: SOL = yürü, SAĞ = bak + ateş. Hiçbiri kaymaz, hep aynı yerde durur.
+   SAĞ joystick iki bölgeli: iç bölge yalnızca yön verir (nişan al), kolu dış halkaya itince ateş başlar.
+   Şarjör ve silah değiştirme düğmeleri sağ joystickin soluna, parmağın erişeceği bir yay üzerine dizilir.
    id: basılı parmağın kimliği, yoksa null (iOS pointerId negatif olabilir, bu yüzden >=0 ile denetlenmez). */
-var JSK={m:{id:null,x:0,y:0,ox:0,oy:0},a:{id:null,x:0,y:0,ox:0,oy:0}},usePtr=false;
-function JR(){return Math.max(44,Math.min(68,Math.min(W,H)*.2))}
-/* SAĞ joystick (saldırı/nişan) sabit: her zaman aynı yerde durur, yalnızca çevresine dokunulunca devreye girer.
-   Şarjör (reload) düğmesi onun soluna yerleşir. */
-var rbP=0;
-function aimC(){var r=JR();return{x:W-r-W*.07,y:H-r-H*.1,r:r}}
-function rlB(){var r=JR(),c=aimC(),br=Math.max(24,r*.42);return{x:c.x-r*1.16-br-12,y:c.y+r*.1,r:br}}
+var JSK={m:{id:null,x:0,y:0,ox:0,oy:0},a:{id:null,x:0,y:0,ox:0,oy:0,fire:0}},usePtr=false;
+/* ---- AYAR: kontroller ---- */
+var AIM_DZ=.12,   /* sağ kol: bu orandan küçük itme yön vermez; dokunup kıpırdatınca hemen nişan */
+    FIRE_ON=.78,  /* sağ kol: kol bu orana (dış kenara yakın) varınca ateş başlar */
+    FIRE_OFF=.5;  /* ateş ancak bu oranın altına inince durur; arası geniş, ateş ederken parmak rahat gezer */
+function JR(){return Math.max(52,Math.min(78,Math.min(W,H)*.22))}
+function JT(){return JR()*.66}
+function JTA(){return JR()*.78}   /* sağ kol menzili: tutamaç halkanın en dışına kadar gider, ateş işaretleri orada */   /* kolun gidebileceği en uzak mesafe (tutamaç halkanın içinde kalır) */
+function LAY(){var r=JR(),mx=Math.max(28,W*.06),my=Math.max(22,H*.1);return{r:r,m:{x:mx+r,y:H-my-r},a:{x:W-mx-r,y:H-my-r}}}
+var rbP=0,swP=0;
+function aimC(){var l=LAY();return{x:l.a.x,y:l.a.y,r:l.r}}
+function moveC(){var l=LAY();return{x:l.m.x,y:l.m.y,r:l.r}}
+function btnAt(deg){var c=aimC(),br=Math.max(22,c.r*.4),d=c.r+br+16,a=deg*Math.PI/180;return{x:c.x+Math.cos(a)*d,y:c.y+Math.sin(a)*d,r:br}}
+function rlB(){return btnAt(168)}
+function swB(){return btnAt(216)}
+function syncSticks(){var l=LAY();JSK.m.ox=l.m.x;JSK.m.oy=l.m.y;JSK.a.ox=l.a.x;JSK.a.oy=l.a.y}
 function stFor(id){return JSK.m.id===id?JSK.m:JSK.a.id===id?JSK.a:null}
-function stSet(t,x,y){var q=cv.getBoundingClientRect(),r=JR(),dx,dy,l;t.x=x-q.left;t.y=y-q.top;
-  if(t===JSK.a){var c=aimC();t.ox=c.x;t.oy=c.y;return}
-  dx=t.x-t.ox;dy=t.y-t.oy;l=Math.hypot(dx,dy);if(l>r){t.ox+=dx/l*(l-r);t.oy+=dy/l*(l-r)}}
+function stSet(t,x,y){var q=cv.getBoundingClientRect();t.x=x-q.left;t.y=y-q.top;syncSticks()}
 function skipT(t){return t&&t.closest&&t.closest('.bt,#start,#pause,#rot')}
-function ptBegin(id,x,y){if(paused||stFor(id))return;var q=cv.getBoundingClientRect(),r=JR(),px=x-q.left,py=y-q.top,live=$('start').classList.contains('off'),t,lo,hi,c,b;
+function ptBegin(id,x,y){if(paused||stFor(id))return;var q=cv.getBoundingClientRect(),L=LAY(),px=x-q.left,py=y-q.top,live=$('start').classList.contains('off'),t,b;
   if(live&&Wpn.hit(px,py)){Wpn.tap(px,py);return}
-  if(live){b=rlB();if(Math.hypot(px-b.x,py-b.y)<=b.r+14){Wpn.reload();rbP=1;return}}
-  if(px<W/2){t=JSK.m;lo=r+10;hi=W/2-6;if(t.id!==null)return;
-    t.id=id;t.ox=t.x=Math.max(lo,Math.min(hi,px));t.oy=t.y=Math.max(r+10,Math.min(H-r-10,py))}
-  else{t=JSK.a;c=aimC();if(t.id!==null||Math.hypot(px-c.x,py-c.y)>c.r*1.45)return;
-    t.id=id;t.ox=c.x;t.oy=c.y;t.x=px;t.y=py}}
-function ptEnd(id){var t=stFor(id);if(t)t.id=null}
+  if(live){b=rlB();if(Math.hypot(px-b.x,py-b.y)<=b.r+14){Wpn.reload();rbP=1;return}
+    if(Wpn.list.length>1){b=swB();if(Math.hypot(px-b.x,py-b.y)<=b.r+14){Wpn.next();swP=1;return}}}
+  syncSticks();
+  if(Math.hypot(px-L.m.x,py-L.m.y)<=L.r*1.7){t=JSK.m;if(t.id!==null)return;t.id=id;t.x=px;t.y=py;return}
+  if(Math.hypot(px-L.a.x,py-L.a.y)<=L.r*1.5){t=JSK.a;if(t.id!==null)return;t.id=id;t.x=px;t.y=py;t.fire=0}}
+function ptEnd(id){var t=stFor(id);if(t){t.id=null;t.fire=0}}
 window.addEventListener('pointerdown',function(e){usePtr=true;if(skipT(e.target))return;e.preventDefault();ptBegin(e.pointerId,e.clientX,e.clientY);try{cv.setPointerCapture(e.pointerId)}catch(_){}},{capture:true,passive:false});
 window.addEventListener('pointermove',function(e){var t=stFor(e.pointerId);if(t){stSet(t,e.clientX,e.clientY);e.preventDefault()}},{capture:true,passive:false});
 window.addEventListener('pointerup',function(e){ptEnd(e.pointerId)},true);
@@ -246,7 +261,7 @@ $('nf').addEventListener('pointerup',function(){if(fs)return;fs=1;A.init()});
 if(window.ZDEV)$('nf').style.display='';
 /* ---------- duraklatma / odak kaybı ---------- */
 var paused=false;
-function clearInput(){keys={};JSK.m.id=JSK.a.id=null}
+function clearInput(){keys={};JSK.m.id=JSK.a.id=null;JSK.a.fire=0}
 function setPause(on){if(on===paused)return;if(on&&!$('start').classList.contains('off'))return;paused=on;clearInput();$('pause').classList.toggle('on',on);
   if(A.c){try{if(on)A.c.suspend();else A.c.resume()}catch(_){}}}
 $('ps').addEventListener('pointerup',function(){setPause(true)});
@@ -267,18 +282,23 @@ function lk(L){var k=1;
    Silah, nişan/ateş sonrası h.hold sn boyunca elde kalır, sonra sırta asılır. */
 var Hero=(function(){
 var PI=Math.PI,sin=Math.sin,cos=Math.cos,sqrt=Math.sqrt,hyp=Math.hypot;
-var K={ol:'#08090d',skin:'#e4c6a8',hair:'#2b2f3c',hairHi:'#434a5c',
-  jk:'#8b94a9',jkHi:'#aab3c7',jkLo:'#687087',slv:'#78819a',slvLo:'#5d667c',
-  pants:'#474d61',boot:'#2d313e',bootHi:'#5b647c',pack:'#2f3341',packHi:'#434a5c',
-  acc:'#ff8a5c',gA:'#3d4354',gB:'#2f3443',gC:'#1b1e27',gHi:'#8b95ad',stock:'#4c5468'};
+var K={ol:'#07080c',skin:'#d9b896',
+  jk:'#6b7690',jkHi:'#8893ad',jkLo:'#4e576d',slv:'#68738d',slvLo:'#4f596f',
+  vest:'#2b303d',vestHi:'#434b5f',pad:'#232733',
+  hl:'#2d3342',hlHi:'#454e64',hlLo:'#1b1f2a',strap:'#59627a',
+  pants:'#3f465a',pantsLo:'#2f3546',boot:'#222631',bootHi:'#59627b',bootLo:'#14171f',
+  pack:'#2a2e3b',packHi:'#3c4357',packLo:'#1b1e27',
+  glove:'#1a1d26',gloveHi:'#434b5f',
+  acc:'#ff8a5c',
+  wd:'#a8693a',wdH:'#d29a62',wdD:'#6a4128',mt:'#78839a',mtH:'#aab4ca',mtD:'#3a404d',mtX:'#58627a',st:'#8791a7'};
 function cl(x,a,b){return x<a?a:x>b?b:x}
 function ss(a,b,x){x=cl((x-a)/(b-a),0,1);return x*x*(3-2*x)}
 function lp(a,b,t){return a+(b-a)*t}
 function ex(k,dt){return 1-Math.exp(-k*dt)}
-function make(hold){return{t:0,ph:0,g:0,mv:0,ldx:1,ldy:0,arm:0,aim:0,armT:0,hold:hold==null?3:hold,rec:0,kick:0}}
-/* i: {spd (birim/sn), ldx,ldy (hareket yönü, karakter ekseninde), aim, fire, carry, recoil, kick} */
+function make(hold){return{t:0,ph:0,g:0,mv:0,ldx:1,ldy:0,arm:0,aim:0,armT:0,hold:hold==null?3:hold,rec:0,kick:0,wp:'ak47',wpT:'ak47',wpOld:'ak47',sws:1,twA:.52}}
+/* i: {spd, ldx,ldy, aim, fire, carry, recoil, kick, wp (silah kimliği)} */
 function update(h,dt,i){
-  var sp=i.spd||0,l,tx,ty,n,want,aimed=!!(i.aim||i.fire);
+  var sp=i.spd||0,l,tx,ty,n,want,aimed=!!(i.aim||i.fire),w;
   h.t+=dt;
   h.mv+=(ss(.2,1.2,sp)-h.mv)*ex(14,dt);
   h.g+=(ss(2.5,3.8,sp)*(1-.6*h.aim)-h.g)*ex(8,dt);
@@ -287,80 +307,140 @@ function update(h,dt,i){
   if(aimed||i.carry)h.armT=h.hold;else h.armT=Math.max(0,h.armT-dt);
   want=h.armT>0?1:0;h.arm+=(want-h.arm)*ex(want?10:5,dt);
   h.aim+=((aimed?1:0)-h.aim)*ex(aimed?18:7,dt);
+  /* silah değişimi: eski silah iner (sws 0→.5), yenisi kalkar (.5→1) */
+  if(i.wp&&i.wp!==h.wpT){h.wpOld=h.wp;h.wpT=i.wp;h.sws=0}
+  h.sws=Math.min(1,h.sws+dt*5.5);h.wp=h.sws<.5?h.wpOld:h.wpT;
+  w=WP[h.wpT]||WP.ak47;h.twA+=(w.tw-h.twA)*ex(12,dt);
   h.rec=i.recoil||0;h.kick=i.kick||0}
 function rr(cx,x,y,w,h,r){r=Math.min(r,w/2,h/2);cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath()}
 function fs(cx,col,lw){cx.fillStyle=col;cx.fill();cx.lineWidth=lw||.015;cx.strokeStyle=K.ol;cx.lineJoin='round';cx.stroke()}
+function fr(cx,x,y,w,h,r,col,lw){rr(cx,x,y,w,h,r);fs(cx,col,lw)}
+function ln(cx,x0,y0,x1,y1,col,lw){cx.strokeStyle=col;cx.lineWidth=lw;cx.lineCap='round';cx.beginPath();cx.moveTo(x0,y0);cx.lineTo(x1,y1);cx.stroke()}
 function limb(cx,x0,y0,x1,y1,w,col){cx.lineCap='round';cx.strokeStyle=K.ol;cx.lineWidth=w+.024;cx.beginPath();cx.moveTo(x0,y0);cx.lineTo(x1,y1);cx.stroke();cx.strokeStyle=col;cx.lineWidth=w;cx.stroke()}
 function elbow(sx,sy,hx,hy,side,cap){var dx=hx-sx,dy=hy-sy,d=hyp(dx,dy),L=.2,hf,b,px,py;
   if(d>.392){hx=sx+dx/d*.392;hy=sy+dy/d*.392;dx=hx-sx;dy=hy-sy;d=.392}
   hf=d/2;b=Math.min(sqrt(Math.max(0,L*L-hf*hf)),cap);px=-dy/(d||1);py=dx/(d||1);
   if(px*-.35+py*side<0){px=-px;py=-py}
   return[(sx+hx)/2+px*b,(sy+hy)/2+py*b,hx,hy]}
+/* bot: topuk, burun kapağı, bağcık şeridi, yerden kalkınca büyür */
 function boot(cx,x,y,lift){cx.save();cx.translate(x,y);
-  if(lift>.02){cx.fillStyle='rgba(0,0,0,'+.3*lift+')';cx.beginPath();cx.ellipse(.015,.03,.085,.055,0,0,6.29);cx.fill()}
+  if(lift>.02){cx.fillStyle='rgba(0,0,0,'+.3*lift+')';cx.beginPath();cx.ellipse(.015,.03,.09,.06,0,0,6.29);cx.fill()}
   var s=1+lift*.17;cx.scale(s,s);
-  rr(cx,-.08,-.055,.19,.11,.055);fs(cx,K.boot,.02);
-  rr(cx,.02,-.038,.075,.076,.038);cx.fillStyle=K.bootHi;cx.fill();cx.restore()}
-function gun(cx,ox,oy,a){cx.save();cx.translate(ox,oy);cx.rotate(a);
-  rr(cx,-.15,-.024,.14,.048,.016);fs(cx,K.stock,.018);          /* dipçik */
-  rr(cx,-.04,-.044,.3,.088,.022);fs(cx,K.gA,.02);               /* gövde */
-  cx.fillStyle=K.gHi;cx.fillRect(-.01,-.026,.22,.012);          /* ray parlaması */
-  rr(cx,.25,-.032,.15,.064,.014);fs(cx,K.gB,.018);              /* kundak */
-  rr(cx,.4,-.024,.09,.048,.012);fs(cx,K.gC,.018);               /* susturucu */
-  cx.fillStyle=K.acc;cx.beginPath();cx.arc(.215,0,.014,0,6.29);cx.fill();   /* arpacık */
+  fr(cx,-.09,-.058,.2,.116,.05,K.boot,.02);
+  fr(cx,-.09,-.05,.045,.1,.02,K.bootLo,.012);
+  rr(cx,.025,-.042,.08,.084,.038);cx.fillStyle=K.bootHi;cx.fill();
+  ln(cx,-.03,0,.02,0,K.bootHi,.012);
+  cx.restore()}
+/* ---- silahlar (üstten görünüş; silah ekseni +x, uç = namlu, y = sağ) ---- */
+function gAK(cx,r){
+  fr(cx,-.205,-.034,.175,.068,.016,K.wd,.018);                    /* dipçik */
+  ln(cx,-.19,-.016,-.05,-.011,K.wdH,.012);ln(cx,-.19,.02,-.05,.014,K.wdD,.01);
+  fr(cx,-.228,-.036,.03,.072,.01,K.mtD,.016);                      /* dipçik pabucu */
+  fr(cx,-.04,-.032,.29,.064,.012,K.mt,.02);                        /* gövde */
+  ln(cx,-.025,-.016,.235,-.016,K.mtH,.01);
+  fr(cx,.15,-.02,.045,.04,.006,K.mtD,.012);                        /* arka gez */
+  fr(cx,.035,.026,.04,.018,.006,K.mtX,.012);                       /* sürgü kolu */
+  fr(cx,.245,-.03,.19,.06,.012,K.wd,.018);                         /* el koruma */
+  ln(cx,.25,-.017,.43,-.017,K.wdH,.01);
+  cx.strokeStyle=K.wdD;cx.lineWidth=.01;cx.beginPath();cx.moveTo(.29,.012);cx.lineTo(.3,.026);cx.moveTo(.33,.012);cx.lineTo(.34,.026);cx.moveTo(.37,.012);cx.lineTo(.38,.026);cx.stroke();
+  fr(cx,.2,-.013,.26,.026,.01,K.mtX,.014);ln(cx,.205,-.005,.455,-.005,K.mtH,.008);   /* gaz borusu */
+  fr(cx,.45,-.024,.045,.048,.008,K.mtX,.014);                      /* gaz bloğu */
+  fr(cx,.49,-.011,.045,.022,.006,K.mtD,.012);                      /* namlu */
+  fr(cx,.535,-.022,.045,.044,.008,K.mtX,.014);                     /* alev kırıcı */
+  ln(cx,.552,-.02,.552,.02,K.mtD,.01);ln(cx,.566,-.02,.566,.02,K.mtD,.01);
+  cx.beginPath();cx.arc(.512,0,.011,0,6.29);cx.fillStyle=K.acc;cx.fill()}      /* arpacık */
+function gPS(cx,r){var b=r*.045;
+  fr(cx,-.055,-.034,.12,.068,.018,'#30343d',.016);                /* kabza kenarları */
+  fr(cx,-.03-b,-.027,.245,.054,.013,K.st,.018);                    /* sürgü */
+  ln(cx,-.015-b,-.014,.2-b,-.014,K.mtH,.009);ln(cx,-.015-b,.019,.2-b,.019,K.mtX,.008);
+  cx.strokeStyle=K.mtD;cx.lineWidth=.008;cx.beginPath();
+  for(var q=0;q<4;q++){cx.moveTo(-.02-b+q*.013,-.022);cx.lineTo(-.02-b+q*.013,.022)}cx.stroke();
+  fr(cx,.07-b,.002,.07,.022,.005,K.mtD,.01);                       /* ejeksiyon penceresi */
+  fr(cx,-.034-b,-.011,.012,.022,.004,K.mtD,.01);                   /* arka gez */
+  fr(cx,.213,-.014,.028,.028,.006,K.mtD,.012);                     /* namlu ucu */
+  cx.beginPath();cx.arc(.19-b,0,.0095,0,6.29);cx.fillStyle=K.acc;cx.fill()}
+var WP={
+  ak47:{draw:gAK,sx:1,sy:1.75,muz:.58,ox:.12,tw:.52,rb:.16,hr:[0,.012],hl:[.33,-.002],cxo:[.07,0],cyo:[.125,.15],cao:[-.3,-.64],sl:[-.17-.17*cos(1.15)+.02,-.17*sin(1.15),1.15]},
+  pistol:{draw:gPS,sx:1.25,sy:1.9,muz:.245,ox:.27,tw:.3,rb:.09,hr:[-.01,.014],hl:[.05,-.016],cxo:[.17,.12],cyo:[.09,.12],cao:[-.1,-.25],sl:[-.03,.265,.06]}
+};
+function glove(cx,x,y,ang,cuffC){cx.save();cx.translate(x,y);cx.rotate(ang);
+  fr(cx,-.036,-.037,.052,.074,.016,cuffC,.014);                    /* manşet */
+  fr(cx,-.016,-.034,.074,.068,.03,K.glove,.016);                   /* eldiven */
+  fr(cx,.022,-.026,.026,.052,.011,K.gloveHi,.01);                  /* parmak kemikleri */
   cx.restore()}
 function draw(cx,h){
-  var g=h.g,mv=h.mv,ph=h.ph,aim=ss(0,1,h.aim),arm=ss(0,1,h.arm),rec=h.rec,sp=sin(ph),
+  var w=WP[h.wp]||WP.ak47,dip=sin(PI*cl(h.sws,0,1)),g=h.g,mv=h.mv,ph=h.ph,aim=ss(0,1,h.aim),arm=ss(0,1,h.arm),rec=h.rec,sp=sin(ph),
+    aimE=aim*(1-.92*dip),armE=arm*(1-.92*dip),
     amp=lp(.2,.31,g)*mv,bias=lp(.1,.02,mv),lw=mv*(.4+.6*g),
     gt=-.11*mv*(.45+.9*g)*sp*(1-.85*aim)*(1-.45*arm),
-    tw=lp(lp(0,lp(.22,.4,g),arm),.52,aim)+gt+.09*rec,
+    tw=lp(lp(0,lp(.22,.4,g),arm),h.twA,aim)+gt+.09*rec,
     lean=lp(0,.03,g)*mv*(1-aim*.6)-.05*rec+.012*aim,
-    bnc=cos(2*ph)*lw*.5,k,s,ph2,hy,fx,fy,lift,L=[],i,t;
+    bnc=cos(2*ph)*lw*.5,k,s,ph2,hy,fx,fy,lift,L=[],i,t,mx,my;
   cx.save();cx.lineJoin='round';
   /* gölge */
-  cx.fillStyle='rgba(0,0,0,.22)';cx.beginPath();cx.ellipse(.0,0,.27,.33,0,0,6.29);cx.fill();
+  cx.fillStyle='rgba(0,0,0,.24)';cx.beginPath();cx.ellipse(.0,0,.29,.35,0,0,6.29);cx.fill();
   /* bacaklar: hareket yönü boyunca karşılıklı sallanır, havadaki ayak büyür */
   for(k=0;k<2;k++){ph2=ph+(k?PI:0);s=amp*sin(ph2);hy=k?.115:-.115;
     fx=(k?-1:1)*bias+h.ldx*s;fy=hy+h.ldy*s;lift=Math.max(0,cos(ph2))*lw;L.push({k:k,hy:hy,x:fx,y:fy,l:lift})}
   if(L[1].l<L[0].l)L.reverse();
-  for(i=0;i<2;i++){t=L[i];limb(cx,0,t.hy,t.x,t.y,.105,K.pants)}
+  for(i=0;i<2;i++){t=L[i];limb(cx,0,t.hy,t.x,t.y,.108,K.pants);mx=t.x*.62;my=t.hy+(t.y-t.hy)*.62;rr(cx,mx-.03,my-.04,.07,.08,.03);fs(cx,K.pad,.012)}
   for(i=0;i<2;i++){t=L[i];boot(cx,t.x,t.y,t.l)}
   /* üst gövde grubu */
   cx.save();cx.translate(lean,0);
   var SW=.235,Rx=-SW*sin(tw),Ry=SW*cos(tw),Lx=SW*sin(tw),Ly=-SW*cos(tw);
-  /* sırt çantası + turuncu şerit */
-  cx.save();cx.rotate(tw);rr(cx,-.215,-.13,.14,.26,.045);fs(cx,K.pack,.02);
-  cx.fillStyle=K.packHi;cx.fillRect(-.2,-.11,.03,.22);cx.fillStyle=K.acc;cx.fillRect(-.145,-.075,.024,.15);
-  /* gövde */
+  cx.save();cx.rotate(tw);
+  /* sırt çantası: ana gövde, kapak, kayışlar, yan cepler, turuncu arka işaret */
+  fr(cx,-.285,-.162,.225,.324,.06,K.pack,.02);
+  fr(cx,-.272,-.15,.085,.3,.045,K.packHi,.014);
+  ln(cx,-.255,-.15,-.255,.15,K.packLo,.01);
+  ln(cx,-.18,-.12,-.07,-.12,K.packLo,.012);ln(cx,-.18,.12,-.07,.12,K.packLo,.012);
+  fr(cx,-.245,.138,.11,.05,.02,K.packHi,.012);fr(cx,-.245,-.188,.11,.05,.02,K.packHi,.012);
+  fr(cx,-.3,-.032,.02,.064,.006,K.acc,.01);
+  /* gövde: omuzlar */
   var br=1+.012*sin(h.t*2.3)*(1-mv);
-  cx.save();cx.scale(1,br);rr(cx,-.112,-.262,.224,.524,.112);fs(cx,K.jk,.022);cx.restore();
-  cx.fillStyle=K.jkHi;cx.beginPath();cx.arc(.0,-.205,.068,0,6.29);cx.arc(.0,.205,.068,0,6.29);cx.fill();   /* omuz başları */
-  cx.strokeStyle=K.jkLo;cx.lineWidth=.016;cx.lineCap='round';cx.beginPath();cx.moveTo(-.06,0);cx.lineTo(.07,0);cx.stroke();   /* fermuar */
+  cx.save();cx.scale(1,br);fr(cx,-.118,-.268,.236,.536,.105,K.jk,.022);cx.restore();
+  ln(cx,-.09,0,.075,0,K.jkLo,.014);
+  /* yelek omuz askıları */
+  fr(cx,-.1,-.145,.21,.072,.024,K.vest,.016);fr(cx,-.1,.073,.21,.072,.024,K.vest,.016);
+  ln(cx,-.085,-.109,.095,-.109,K.vestHi,.008);ln(cx,-.085,.109,.095,.109,K.vestHi,.008);
+  /* omuz başları + kol bandı */
+  cx.beginPath();cx.arc(.0,-.205,.072,0,6.29);fs(cx,K.jkHi,.016);cx.beginPath();cx.arc(.0,.205,.072,0,6.29);fs(cx,K.jkHi,.016);
+  fr(cx,-.03,-.24,.026,.05,.008,K.acc,.008);
   cx.restore();
-  /* hedef eller: serbest sallanma → silah tutuşu */
+  /* silah kutuplarına: hedef eller */
   var swA=lp(.07,.17,g)*mv,fRx=Rx+.02+swA*sp,fRy=Ry+.07,fLx=Lx+.02-swA*sp,fLy=Ly-.07,
-    cxo=lp(.07,0,g)+.012*cos(2*ph)*lw,cyo=lp(.125,.15,g)+.012*sp*lw,cao=lp(-.3,-.64,g)+.06*sp*lw,
-    ox=lp(cxo,.2,aim)-.16*rec,oy=lp(cyo,0,aim),oa=lp(cao,h.kick,aim),
-    sa=1.15,sox=-.17-.17*cos(sa)+.02,soy=-.17*sin(sa)+.0;
-  ox=lp(sox,ox,arm);oy=lp(soy,oy,arm);oa=lp(sa,oa,arm);
-  var ha=ss(.3,.95,arm),gRx=ox,gRy=oy,gLx=ox+.22*cos(oa),gLy=oy+.22*sin(oa),
+    cxo=lp(w.cxo[0],w.cxo[1],g)+.012*cos(2*ph)*lw,cyo=lp(w.cyo[0],w.cyo[1],g)+.012*sp*lw,cao=lp(w.cao[0],w.cao[1],g)+.06*sp*lw,
+    ox=lp(cxo,w.ox,aimE)-w.rb*rec,oy=lp(cyo,0,aimE),oa=lp(cao,h.kick,aimE);
+  ox=lp(w.sl[0],ox,armE);oy=lp(w.sl[1],oy,armE);oa=lp(w.sl[2],oa,armE);
+  var ha=ss(.3,.95,armE),co=cos(oa),si=sin(oa),
+    gRx=ox+w.hr[0]*co-w.hr[1]*si,gRy=oy+w.hr[0]*si+w.hr[1]*co,gLx=ox+w.hl[0]*co-w.hl[1]*si,gLy=oy+w.hl[0]*si+w.hl[1]*co,
     hRx=lp(fRx,gRx,ha),hRy=lp(fRy,gRy,ha),hLx=lp(fLx,gLx,ha),hLy=lp(fLy,gLy,ha),
-    cap=lp(lp(.04,.09,g),.12,Math.max(ha,aim))+0,eR=elbow(Rx,Ry,hRx,hRy,1,cap),eL=elbow(Lx,Ly,hLx,hLy,-1,cap);
-  gun(cx,ox,oy,oa);
-  limb(cx,Lx,Ly,eL[0],eL[1],.08,K.slv);limb(cx,eL[0],eL[1],eL[2],eL[3],.068,K.slvLo);
-  limb(cx,Rx,Ry,eR[0],eR[1],.08,K.slv);limb(cx,eR[0],eR[1],eR[2],eR[3],.068,K.slvLo);
-  cx.beginPath();cx.arc(eL[2],eL[3],.042,0,6.29);fs(cx,K.skin,.018);
-  cx.beginPath();cx.arc(eR[2],eR[3],.042,0,6.29);fs(cx,K.skin,.018);
-  /* baş: kapüşon halkası, kulaklar, bere, yüzde ince ten şeridi */
+    cap=lp(lp(.04,.09,g),.075,Math.max(ha,aimE))+0,eR=elbow(Rx,Ry,hRx,hRy,1,cap),eL=elbow(Lx,Ly,hLx,hLy,-1,cap);
+  /* silah */
+  cx.save();cx.translate(ox,oy);cx.rotate(oa);cx.scale(w.sx,w.sy);w.draw(cx,rec);cx.restore();
+  /* kollar: üst kol + ön kol, dirsek koruması, eldiven */
+  limb(cx,Lx,Ly,eL[0],eL[1],.082,K.slv);limb(cx,eL[0],eL[1],eL[2],eL[3],.07,K.slvLo);
+  limb(cx,Rx,Ry,eR[0],eR[1],.082,K.slv);limb(cx,eR[0],eR[1],eR[2],eR[3],.07,K.slvLo);
+  cx.beginPath();cx.arc(eL[0],eL[1],.034,0,6.29);fs(cx,K.pad,.012);cx.beginPath();cx.arc(eR[0],eR[1],.034,0,6.29);fs(cx,K.pad,.012);
+  glove(cx,eL[2],eL[3],Math.atan2(eL[3]-eL[1],eL[2]-eL[0]),K.slvLo);
+  glove(cx,eR[2],eR[3],Math.atan2(eR[3]-eR[1],eR[2]-eR[0]),K.slvLo);
+  /* baş: boyun örtüsü, kulaklar, kask (ray, gece görüş yuvası, arka turuncu ışık) */
   var hs=1+.035*bnc,hyy=.016*aim;
   cx.save();cx.translate(.01,hyy);cx.scale(hs,hs);
-  cx.beginPath();cx.arc(-.02,-.108,.026,0,6.29);cx.arc(-.02,.108,.026,0,6.29);fs(cx,K.skin,.016);
-  cx.beginPath();cx.arc(0,0,.106,0,6.29);fs(cx,K.skin,.018);
-  cx.beginPath();cx.arc(-.03,0,.1,0,6.29);cx.fillStyle=K.hair;cx.fill();
-  cx.fillStyle=K.hairHi;cx.beginPath();cx.ellipse(-.05,-.03,.05,.032,-.5,0,6.29);cx.fill();
+  cx.beginPath();cx.arc(-.02,0,.11,0,6.29);fs(cx,K.vest,.016);
+  cx.beginPath();cx.arc(-.012,-.113,.024,0,6.29);cx.arc(-.012,.113,.024,0,6.29);fs(cx,K.skin,.014);
+  cx.beginPath();cx.ellipse(.0,0,.132,.113,0,0,6.29);fs(cx,K.hl,.02);
+  cx.fillStyle=K.hlHi;cx.beginPath();cx.ellipse(-.004,0,.1,.083,0,0,6.29);cx.fill();
+  cx.fillStyle=K.hl;cx.beginPath();cx.ellipse(-.012,.006,.084,.066,0,0,6.29);cx.fill();
+  cx.fillStyle=K.hlHi;cx.beginPath();cx.ellipse(-.03,-.026,.04,.018,-.35,0,6.29);cx.fill();
+  ln(cx,-.09,0,.09,0,K.hlLo,.012);
+  fr(cx,.098,-.032,.042,.064,.012,K.hlLo,.014);
+  fr(cx,-.138,-.016,.032,.032,.01,K.acc,.01);
   cx.restore();
   cx.restore();cx.restore()}
-return{make:make,update:update,draw:draw,MUZ:.68}})();
+return{make:make,update:update,draw:draw,WP:WP,
+  muz:function(h){var w=WP[h.wpT]||WP.ak47;return w.ox+w.muz*w.sx},
+  rb:function(h){return (WP[h.wpT]||WP.ak47).rb},MUZ:.68}})();
 
 /* ---------- çizim ---------- */
 function X(x){return Math.round(((x-cam.x)*S+W/2)*DPR)/DPR}function Y(y){return Math.round(((y-cam.y)*S+H/2)*DPR)/DPR}
@@ -436,7 +516,7 @@ function shotSnd(){if(!A.on||!vok(4,.4))return;var c=A.c,t=c.currentTime,o=A.out
   if(!(sCnt&1)){u=t+.2+Math.random()*.15;q=c.createOscillator();w=c.createGain();q.type='sine';q.frequency.value=4200+Math.random()*1400;w.gain.setValueAtTime(.0001,u);w.gain.linearRampToValueAtTime(.02,u+.002);w.gain.exponentialRampToValueAtTime(.0001,u+.09);q.connect(w);w.connect(A.out((Math.random()-.5)*.6));q.start(u);q.stop(u+.1)}}
 function hitSnd(d){if(!A.on||!vok(1,d+.12))return;var c=A.c,t=c.currentTime+d,q=c.createBufferSource(),b=c.createBiquadFilter(),w=c.createGain();q.buffer=A.nb;b.type='bandpass';b.frequency.value=2800+Math.random()*1200;b.Q.value=1.2;w.gain.setValueAtTime(.06,t);w.gain.exponentialRampToValueAtTime(.0005,t+.05);q.connect(b);b.connect(w);w.connect(A.out(0));q.start(t,Math.random()*.6);q.stop(t+.06)}
 /* ---- atış: sıkış hızı 820 d/dk; dağılma ardışık atışla açılır, silah yana/yukarı tepilir, oyuncu geri itilir, kamera sarsılır ---- */
-function shoot(){var ga=pa+kick,sd=(Math.random()+Math.random()-1)*(.014+bloom+.012*Math.min(1,Math.hypot(pl.vx,pl.vy)/4)),an=ga+sd,dx=Math.cos(an),dy=Math.sin(an),r=rh(pl.x,pl.y,dx,dy,16),mu=Hero.MUZ-.16*recoil,mx=pl.x+Math.cos(ga)*mu,my=pl.y+Math.sin(ga)*mu,sx=-Math.sin(ga),sy=Math.cos(ga),sp0=2.2+Math.random()*1.6;
+function shoot(){var ga=pa+kick,sd=(Math.random()+Math.random()-1)*(.014+bloom+.012*Math.min(1,Math.hypot(pl.vx,pl.vy)/4)),an=ga+sd,dx=Math.cos(an),dy=Math.sin(an),r=rh(pl.x,pl.y,dx,dy,RANGE),mu=Hero.muz(HR)-Hero.rb(HR)*recoil,mx=pl.x+Math.cos(ga)*mu,my=pl.y+Math.sin(ga)*mu,sx=-Math.sin(ga),sy=Math.cos(ga),sp0=2.2+Math.random()*1.6;
   bul.push({x:mx,y:my,dx:dx,dy:dy,p:0,L:Math.max(0,r.t-mu),v:36+Math.random()*6,h:r.h,nx:r.nx||0,ny:r.ny||0});
   flash=.055;mzx=mx;mzy=my;fl2=[Math.random(),Math.random(),Math.random(),Math.random()];
   recoil=Math.min(1,recoil+.34);bloom=Math.min(.075,bloom+.0075);kick=Math.max(-.1,Math.min(.1,kick+(Math.random()*2-1)*.03+((sCnt&1)?.012:-.012)));
@@ -454,7 +534,7 @@ function upd(dt){var i,b,q,f,nx,ny;
 /* ---- çizim ---- */
 function drawBack(){var i,q,w=Math.sin(wph);
   for(i=0;i<cas.length;i++){q=cas[i];cx.save();cx.translate(X(q.x),Y(q.y));cx.rotate(q.a);cx.globalAlpha=Math.min(1,q.l);cx.fillStyle='#b98a3e';cx.fillRect(-.05*S,-.025*S,.1*S,.05*S);cx.restore()}
-  cx.save();cx.translate(X(pl.x),Y(pl.y));cx.rotate(pa);cx.scale(S*1.22,S*1.22);Hero.draw(cx,HR);cx.restore()}
+  cx.save();cx.translate(X(pl.x),Y(pl.y));cx.rotate(pa);cx.scale(S*1.5,S*1.5);Hero.draw(cx,HR);cx.restore()}
 function dynLights(){var o={x:pl.x,y:pl.y,r:5,col:'188,210,255',dyn:1},m,k;vis(o);lampDraw(o,.7);
   if(flash>0){m=g(mzx|0,mzy|0)===0?{x:pl.x,y:pl.y}:{x:mzx,y:mzy};m={x:m.x,y:m.y,r:7.5,col:'255,190,110',dyn:1};vis(m);k=flash/.055;lampDraw(m,1.6*k*(.75+.25*Math.random()))}}
 function drawFx(){var i,q,b,p0,p1,gd,a,k,mx0,my0,ga=pa+kick;
@@ -600,8 +680,8 @@ var Wpn=(function(){
     part(c,PP.port,MTd);
     for(t=0;t<4;t++)ln(c,'M'+(13+t*1.7)+' 8L'+(12.4+t*1.7)+' 13.2',MTd,.7);
     part(c,PP.muz,MTd);part(c,PP.rs,MTd);part(c,PP.fs,'#ff8a5c')}
-  var L=[{id:'ak47',name:'AK-47',mag:30,res:Infinity,rel:1.3,box:{x0:0,y0:7.2,w:98.6,h:33.4},draw:drawAK},
-    {id:'pistol',name:'M9',mag:12,res:Infinity,rel:1,box:{x0:5,y0:3.8,w:54.4,h:36},draw:drawPistol}];
+  var L=[{id:'ak47',name:'AK-47',mag:30,res:Infinity,rel:1.3,box:{x0:0,y0:7.2,w:98.6,h:33.4},draw:drawAK,fi:60/820},
+    {id:'pistol',name:'M9',mag:12,res:Infinity,rel:1,box:{x0:5,y0:3.8,w:54.4,h:36},draw:drawPistol,fi:60/360}];
   var i=0,st=L.map(function(w){return{a:w.mag,r:w.res,rl:0,a0:0,tg:0}}),sw=1,pulse=0,kick=0,u=1,px=0,py=0,PW=BW,PH=BH,sl=0,sb=0,lk='',lc=0,pv=0,pbe=document.createElement('div');
   pbe.style.cssText='position:fixed;left:0;top:0;width:env(safe-area-inset-left,0px);height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none';
   var pbr=document.createElement('div'),sr=0;
@@ -628,7 +708,8 @@ var Wpn=(function(){
     select:function(n){n=((n%L.length)+L.length)%L.length;if(n===i)return;st[i].rl=0;pv=i;i=n;sw=0},
     next:function(){this.select(i+1)},
     update:function(dt){var s=st[i],t;sw=Math.min(1,sw+dt*6.5);pulse*=Math.exp(-dt*8);kick*=Math.exp(-dt*14);
-      if(s.rl>0){s.rl-=dt;if(s.rl<=0){s.rl=0;t=s.tg-s.a;s.a=s.tg;s.r-=t}}},
+      if(s.rl>0){s.rl-=dt;if(s.rl<=0){s.rl=0;t=s.tg-s.a;s.a=s.tg;s.r-=t}}
+      else if(s.a<=0&&sw>=1)this.reload()},   /* otomatik şarjör: boşalan silah (silah değişiminden sonra bile) kendiliğinden dolar */
     hit:function(x,y){lay();return x>=px-14&&y<=py+PH+14},
     tap:function(x,y){var n=L.length,rx,k;lay();pulse=1;if(n<2)return;
       rx=px+tickX(n,0)*u;if(y<py+22*u&&x>=rx-6){k=Math.floor((x-rx+6)/(13*u));this.select(Math.max(0,Math.min(n-1,k)))}else this.next()},
@@ -704,36 +785,36 @@ var C_BG='#0c0f16',C_RING='#3b4459',C_RING2='#252c3d',C_TICK='#7a86a3',C_KNOB='#
 function mixc(a,b,t){var A=[parseInt(a.substr(1,2),16),parseInt(a.substr(3,2),16),parseInt(a.substr(5,2),16)],B=[parseInt(b.substr(1,2),16),parseInt(b.substr(3,2),16),parseInt(b.substr(5,2),16)];
   return 'rgb('+Math.round(A[0]+(B[0]-A[0])*t)+','+Math.round(A[1]+(B[1]-A[1])*t)+','+Math.round(A[2]+(B[2]-A[2])*t)+')'}
 function disc(x,y,r,fill,stroke,lw){cx.beginPath();cx.arc(x,y,r,0,6.2832);if(fill){cx.fillStyle=fill;cx.fill()}if(stroke){cx.lineWidth=lw||1.5;cx.strokeStyle=stroke;cx.stroke()}}
-/* SOL joystick (yürüme): koyu disk, dört yönde ok ucu, ortada tutamaç */
-function drawStick(t,hx,hy){var r=JR(),on=t.id!==null,ox=on?t.ox:hx,oy=on?t.oy:hy,kx=ox,ky=oy,dx,dy,l,i,a,ca,sa2,d=r*.8;
-  if(on){dx=t.x-t.ox;dy=t.y-t.oy;l=Math.hypot(dx,dy)||1;l=Math.min(l,r)/l;kx=ox+dx*l;ky=oy+dy*l}
-  cx.save();cx.lineCap='round';cx.lineJoin='round';
-  disc(ox,oy,r,C_BG,on?'#5b6682':C_RING,2);disc(ox,oy,r*.62,null,C_RING2,1);
-  cx.lineWidth=1.8;cx.strokeStyle=on?C_KR:C_TICK;cx.beginPath();
-  for(i=0;i<4;i++){a=i*1.5708;ca=Math.cos(a);sa2=Math.sin(a);
-    cx.moveTo(ox+ca*(d-2)-sa2*5,oy+sa2*(d-2)+ca*5);cx.lineTo(ox+ca*(d+4),oy+sa2*(d+4));cx.lineTo(ox+ca*(d-2)+sa2*5,oy+sa2*(d-2)-ca*5)}
-  cx.stroke();
-  disc(kx,ky,r*.36,on?C_ACT:C_KNOB,on?C_HI:C_KR,2.2);disc(kx,ky,r*.17,null,on?C_KR:C_RING,1.5);
-  cx.restore()}
-/* SAĞ joystick (saldırı/nişan): nişangah; basılınca turuncu */
-function drawAim(t){var c=aimC(),r=c.r,on=t.id!==null,ring=on?C_ORGD:C_RING,tk=on?C_ORG:C_TICK,kx=c.x,ky=c.y,dx,dy,l,i,a,ca,sa2,kr=r*.3,m;
-  if(on){dx=t.x-c.x;dy=t.y-c.y;l=Math.hypot(dx,dy)||1;l=Math.min(l,r)/l;kx=c.x+dx*l;ky=c.y+dy*l}
+/* SOL joystick (yürüme): sade halka + tutamaç, dokununca açılır */
+function drawStick(t){var c=moveC(),r=c.r,tr=JT(),on=t.id!==null,kx=c.x,ky=c.y,dx,dy,l;
+  if(on){dx=t.x-c.x;dy=t.y-c.y;l=Math.hypot(dx,dy)||1;l=Math.min(l,tr)/l;kx=c.x+dx*l;ky=c.y+dy*l}
   cx.save();cx.lineCap='round';
-  disc(c.x,c.y,r,C_BG,ring,2);disc(c.x,c.y,r*.52,null,on?'#5a3526':C_RING2,1.2);
-  /* dış çentikler: dört ana yön uzun ve parlak, dört çapraz yön kısa ve sönük */
-  for(i=0;i<8;i++){a=i*.7854;ca=Math.cos(a);sa2=Math.sin(a);m=i%2===0;
-    cx.lineWidth=m?2:1.5;cx.strokeStyle=m?tk:(on?C_ORGD:C_RING);cx.beginPath();
-    cx.moveTo(c.x+ca*r*(m?.8:.88),c.y+sa2*r*(m?.8:.88));cx.lineTo(c.x+ca*r*(m?1.14:1.0),c.y+sa2*r*(m?1.14:1.0));cx.stroke()}
-  /* merkez artı */
-  cx.lineWidth=1.2;cx.strokeStyle=on?'#5a3526':C_RING2;cx.beginPath();
-  for(i=0;i<4;i++){a=i*1.5708;ca=Math.cos(a);sa2=Math.sin(a);cx.moveTo(c.x+ca*r*.12,c.y+sa2*r*.12);cx.lineTo(c.x+ca*r*.36,c.y+sa2*r*.36)}cx.stroke();
-  if(on){cx.lineWidth=1.5;cx.strokeStyle=C_ORGD;cx.beginPath();cx.moveTo(c.x,c.y);cx.lineTo(kx,ky);cx.stroke()}
-  /* tutamaç: küçük nişangah */
-  disc(kx,ky,kr,on?C_ORGBG:C_KNOB,on?C_ORG:C_KR,2.2);
-  cx.lineWidth=1.8;cx.strokeStyle=on?C_ORG:C_KR;cx.beginPath();
-  for(i=0;i<4;i++){a=i*1.5708;ca=Math.cos(a);sa2=Math.sin(a);cx.moveTo(kx+ca*kr*.42,ky+sa2*kr*.42);cx.lineTo(kx+ca*kr*1.5,ky+sa2*kr*1.5)}cx.stroke();
-  disc(kx,ky,2,on?C_ORG:C_HI);
+  disc(c.x,c.y,r,C_BG,on?'#5b6682':C_RING,1.8);
+  if(on){cx.lineWidth=1.5;cx.strokeStyle=C_RING2;cx.beginPath();cx.moveTo(c.x,c.y);cx.lineTo(kx,ky);cx.stroke()}
+  disc(kx,ky,r*.3,on?C_ACT:C_KNOB,on?C_HI:C_KR,2);disc(kx,ky,2,on?C_HI:C_KR);
   cx.restore()}
+/* SAĞ joystick (bak + ateş): iç bölge yön verir, noktalı halkanın dışı ateş eder; ateşte turuncu, yayılma halkası nişan dağılmasını gösterir */
+function drawAim(t){var c=aimC(),r=c.r,tr=JTA(),on=t.id!==null,hot=!!t.fire,kx=c.x,ky=c.y,dx,dy,l,k=0,sp;
+  if(on){dx=t.x-c.x;dy=t.y-c.y;l=Math.hypot(dx,dy)||1;k=Math.min(1,l/tr);l=Math.min(l,tr)/l;kx=c.x+dx*l;ky=c.y+dy*l}
+  cx.save();cx.lineCap='round';
+  sp=bloom*r*2.2;if(hot||bloom>.003){cx.lineWidth=1.4;cx.strokeStyle=C_ORGD;cx.beginPath();cx.arc(c.x,c.y,r+5+sp,0,6.2832);cx.stroke()}
+  disc(c.x,c.y,r,hot?C_ORGBG:C_BG,hot?C_ORG:on?'#5b6682':C_RING,hot?2.2:1.8);
+  /* ateş işaretleri: nişan alırken dış kenarda belirir; kolu oraya sürükleyince ateş başlar */
+  if(on&&k>AIM_DZ){var ft=Math.min(1,(k-AIM_DZ)/.5),fc=mixc(C_RING2,hot?C_ORG:C_ORGD,hot?1:ft),i,a,ca,sa2;
+    cx.lineWidth=hot?2.6:2;cx.strokeStyle=fc;cx.beginPath();
+    for(i=0;i<28;i++){a=i/28*6.2832;ca=Math.cos(a);sa2=Math.sin(a);cx.moveTo(c.x+ca*(tr-6),c.y+sa2*(tr-6));cx.lineTo(c.x+ca*(tr+6),c.y+sa2*(tr+6))}
+    cx.stroke()}
+  if(on&&k>AIM_DZ){cx.lineWidth=1.5;cx.strokeStyle=hot?C_ORGD:C_RING;cx.beginPath();cx.moveTo(c.x,c.y);cx.lineTo(kx,ky);cx.stroke()}
+  disc(kx,ky,r*.27,hot?C_ORGBG:on?C_ACT:C_KNOB,hot?C_ORG:on?C_HI:C_KR,2);disc(kx,ky,2,hot?C_ORG:on?C_HI:C_KR);
+  cx.restore()}
+/* silah değiştirme düğmesi: iki karşıt ok; basınca kısa vurgu */
+function drawSwitch(){if(Wpn.list.length<2)return;var b=swB(),a=b.r*.42,h=a*.42;swP=Math.max(0,swP-fdt*5);
+  cx.save();cx.lineCap='round';cx.lineJoin='round';
+  disc(b.x,b.y,b.r,swP>.05?C_ACT:C_BG,C_RING,2);
+  cx.lineWidth=2;cx.strokeStyle=swP>.05?C_HI:C_KR;cx.beginPath();
+  cx.moveTo(b.x-a,b.y-h);cx.lineTo(b.x+a,b.y-h);cx.moveTo(b.x+a-h,b.y-h*2);cx.lineTo(b.x+a,b.y-h);cx.lineTo(b.x+a-h,b.y);
+  cx.moveTo(b.x+a,b.y+h);cx.lineTo(b.x-a,b.y+h);cx.moveTo(b.x-a+h,b.y+h*2);cx.lineTo(b.x-a,b.y+h);cx.lineTo(b.x-a+h,b.y);
+  cx.stroke();cx.restore()}
 /* şarjör düğmesi: koyu disk + dairesel ok; dolum sırasında ilerleme halkası, şarjör azalınca turuncu nabız */
 function drawReload(){var b=rlB(),p=Wpn.rlp(),lo=Wpn.low(),rl=p>=0,ir=b.r*.42,a2=4.3,ex,ey,tx,ty,nx,ny,sz=ir*.62,
     col=rl?C_HI:lo?mixc(C_ORGD,C_ORG,.5+.5*Math.sin(T*7)):C_KR,ring=rl?C_RING2:lo?mixc(C_RING,C_ORGD,.5+.5*Math.sin(T*7)):C_RING;
@@ -746,11 +827,10 @@ function drawReload(){var b=rlB(),p=Wpn.rlp(),lo=Wpn.low(),rl=p>=0,ir=b.r*.42,a2
   ex=Math.cos(a2)*ir;ey=Math.sin(a2)*ir;tx=-Math.sin(a2);ty=Math.cos(a2);nx=Math.cos(a2);ny=Math.sin(a2);
   cx.fillStyle=col;cx.beginPath();cx.moveTo(ex+tx*sz*.9,ey+ty*sz*.9);cx.lineTo(ex+nx*sz*.62,ey+ny*sz*.62);cx.lineTo(ex-nx*sz*.62,ey-ny*sz*.62);cx.closePath();cx.fill();
   cx.restore()}
-function drawTouch(){var r=JR();drawStick(JSK.m,r+W*.07,H-r-H*.1);drawAim(JSK.a);drawReload()}
+function drawTouch(){drawStick(JSK.m);drawAim(JSK.a);drawReload();drawSwitch()}
 function drawHud(){var mc=cx;hx.save();hx.setTransform(1,0,0,1,0,0);hx.clearRect(0,0,hv.width,hv.height);hx.restore();hx.setTransform(hv.width/W,0,0,hv.height/H,0,0);
   if(!$('start').classList.contains('off'))return;cx=hx;try{drawHud2()}finally{cx=mc}}
 function drawHud2(){if(PERFHUD){cx.save();cx.fillStyle='rgba(244,242,238,.45)';cx.font='11px -apple-system,system-ui,sans-serif';cx.textAlign='left';cx.fillText(Math.round(pfFps)+' fps  '+pfMs.toFixed(1)+' ms',12,H-8);cx.restore()}drawArrow();drawMini();Wpn.draw();drawTouch()}
-var FOV=2,VR=10,VN=2;
 function vr(d){var q=Math.max(0,Math.min(1,(1-d/(FOV/2))/.5));return VN+(VR-VN)*q*q*(3-2*q)}
 var MKA=new Float64Array(4096),MKB=[];for(var mi=0;mi<96;mi++)MKB.push(-PI+mi/96*2*PI);
 function drawMask(){var ox=pl.x,oy=pl.y,ca=pa,L=MKA,ln=96,P=mkP||[],i,x,y,a,d,dist,x0=Math.max(0,Math.floor(ox-VR)),x1=Math.min(MW,Math.ceil(ox+VR)),y0=Math.max(0,Math.floor(oy-VR)),y1=Math.min(MH,Math.ceil(oy+VR));
@@ -761,20 +841,20 @@ function drawMask(){var ox=pl.x,oy=pl.y,ca=pa,L=MKA,ln=96,P=mkP||[],i,x,y,a,d,di
   mkP=P;cx.beginPath();cx.rect(0,0,W,H);cx.moveTo(P[0],P[1]);for(i=2;i<P.length;i+=2)cx.lineTo(P[i],P[i+1]);cx.closePath();cx.fillStyle='#050609';cx.fill('evenodd')}
 /* benzetim adımı: uzun karelerde MAXSTEP'ten büyük adım atılmaz (duvardan geçme/takılma riskini azaltır) */
 var MAXSTEP=1/40,FPSCAP=0,PERFHUD=!!window.ZDEV,pfFps=60,pfMs=0;
-function sim(dt){T+=dt;
+function sim(dt){T+=dt;syncSticks();
   var live=$('start').classList.contains('off'),kx=live?(keys.d?1:0)-(keys.a?1:0):0,ky=live?(keys.s?1:0)-(keys.w?1:0):0,mx=kx,my=ky,ax=live?((keys.arrowright)?1:0)-((keys.arrowleft)?1:0):0,ay=live?((keys.arrowdown)?1:0)-((keys.arrowup)?1:0):0,mv,sp,f,la,n=0,q,qy,l,k;
-  if(live&&JSK.m.id!==null){q=JSK.m.x-JSK.m.ox;qy=JSK.m.y-JSK.m.oy;l=Math.hypot(q,qy);k=Math.min(1,l/JR());if(l>0){mx+=q/l*k;my+=qy/l*k}}
-  if(live&&JSK.a.id!==null){q=JSK.a.x-JSK.a.ox;qy=JSK.a.y-JSK.a.oy;l=Math.hypot(q,qy);k=Math.min(1,l/JR());if(l>0){ax+=q/l*k;ay+=qy/l*k}}
+  if(live&&JSK.m.id!==null){q=JSK.m.x-JSK.m.ox;qy=JSK.m.y-JSK.m.oy;l=Math.hypot(q,qy);k=Math.min(1,l/JT());if(l>0){mx+=q/l*k;my+=qy/l*k}}
+  if(live&&JSK.a.id!==null){q=JSK.a.x-JSK.a.ox;qy=JSK.a.y-JSK.a.oy;l=Math.hypot(q,qy);k=Math.min(1,l/JTA());if(l>0){ax+=q/l*k;ay+=qy/l*k}if(k>=FIRE_ON)JSK.a.fire=1;else if(k<FIRE_OFF)JSK.a.fire=0}
   mv=Math.hypot(mx,my);if(mv>1){mx/=mv;my/=mv;mv=1}if(mv<.12){mx=my=mv=0}
-  am=Math.hypot(ax,ay);firing=live&&!fs&&(JSK.a.id!==null||!!keys[' ']);
-  if(am>.25)aimT=Math.atan2(ay,ax);else if(mv>.2&&!firing)aimT=Math.atan2(my,mx);   /* sağ joystick yönü verir; ateş ederken yürüyüş bakışı bozmaz */
+  am=Math.hypot(ax,ay);firing=live&&!fs&&(!!JSK.a.fire||!!keys[' ']);
+  if(am>AIM_DZ)aimT=Math.atan2(ay,ax);else if(mv>.2&&!firing)aimT=Math.atan2(my,mx);   /* sağ joystick yönü verir; ateş ederken yürüyüş bakışı bozmaz */
   pa+=wrap(aimT-pa)*Math.min(1,dt*(firing?24:11));
   sp=firing?3:4.4;f=Math.min(1,dt*(mv?13:9));pl.vx+=(mx*sp-pl.vx)*f;pl.vy+=(my*sp-pl.vy)*f;
   pl.x+=pl.vx*dt;pcol();pl.y+=pl.vy*dt;pcol();wph+=Math.hypot(pl.vx,pl.vy)*dt*2.4;if(Math.floor(wph/PI)!==wpl){wpl=Math.floor(wph/PI);if(live&&Math.hypot(pl.vx,pl.vy)>.8)stepSnd(wpl&1?1:-1)}
   if(live&&keys.r){keys.r=0;Wpn.reload()}Wpn.update(dt);
-  cool-=dt;if(firing&&Wpn.ok()){while(cool<=0&&n++<3&&Wpn.ok()){shoot();cool+=FI}}else if(cool<0)cool=0;
+  cool-=dt;if(firing&&Wpn.ok()){while(cool<=0&&n++<3&&Wpn.ok()){shoot();cool+=Wpn.cur().fi}}else if(cool<0)cool=0;
   recoil*=Math.exp(-dt*13);bloom=Math.max(0,bloom-dt*.15);kick*=Math.exp(-dt*9);flash=Math.max(0,flash-dt);f=Math.exp(-dt*9);ck.x*=f;ck.y*=f;
-  Hero.update(HR,dt,{spd:Math.hypot(pl.vx,pl.vy),ldx:pl.vx*Math.cos(pa)+pl.vy*Math.sin(pa),ldy:-pl.vx*Math.sin(pa)+pl.vy*Math.cos(pa),aim:am>.25||firing,fire:firing&&Wpn.ok(),recoil:recoil,kick:kick});
+  Hero.update(HR,dt,{spd:Math.hypot(pl.vx,pl.vy),ldx:pl.vx*Math.cos(pa)+pl.vy*Math.sin(pa),ldy:-pl.vx*Math.sin(pa)+pl.vy*Math.cos(pa),aim:am>AIM_DZ||firing,fire:firing&&Wpn.ok(),recoil:recoil,kick:kick,wp:Wpn.cur().id});
   upd(dt);if((seenT-=dt)<=0){seenT=.05;markSeen()}fadeSeen(dt);
   if(!fs&&g(pl.x|0,pl.y|0)===3){fs=1;floorSnd()}
   la=Math.max(mv*.6,Math.min(1,am)*.8);f=Math.min(1,dt*7);cs.x+=(pl.x+Math.cos(aimT)*la-cs.x)*f;cs.y+=(pl.y+Math.sin(aimT)*la-cs.y)*f;

@@ -13,12 +13,26 @@
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script>
+/* tam ekran yüksekliği: ev çubuğu / alt alan dahil (ekranın alt şeridi açıkta kalmasın) */
+(function(){
+  function fh(){
+    var iw=window.innerWidth,ih=window.innerHeight,land=iw>ih,sh=screen.height,sw=screen.width;
+    var scr=land?Math.min(sh,sw):Math.max(sh,sw);
+    var h=Math.max(ih,document.documentElement.clientHeight,scr);
+    document.documentElement.style.setProperty('--full-h',h+'px');
+  }
+  fh();
+  window.addEventListener('resize',fh);
+  window.addEventListener('orientationchange',function(){setTimeout(fh,250)});
+})();
+</script>
+<script>
 /* geliştirici modu: fps / ms göstergesi + "yeni kat" düğmesi (hub'daki ZDEV ile aynı). Varsayılan açık; başlangıç ekranındaki yazıdan değişir. */
 window.ZDEV=(function(){try{return localStorage.getItem('vita_dev')!=='0'}catch(e){return true}})();
 </script>
 <style>
 /* yatay yönlendirme uyarısı: yalnızca dikey duruşta görünür */
-#rot{position:fixed;inset:0;z-index:99;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#f4f2ee;font-family:-apple-system,"SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;touch-action:none}
+#rot{position:fixed;inset:0;height:var(--full-h,100%);z-index:99;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#f4f2ee;font-family:-apple-system,"SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;touch-action:none}
 #rot svg{width:64px;height:64px;animation:rt 2.8s ease-in-out infinite}
 #dvt{position:absolute;left:0;right:0;bottom:12px;padding:12px 0;font-size:10px;letter-spacing:.22em;text-indent:.22em;text-transform:uppercase;color:rgba(244,242,238,.36);cursor:pointer}
 #dvt:active{color:#f4f2ee}
@@ -30,7 +44,7 @@ window.ZDEV=(function(){try{return localStorage.getItem('vita_dev')!=='0'}catch(
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <style>
 :root{--fg:#f4f2ee;--dim:rgba(244,242,238,.46);box-sizing:border-box;color-scheme:dark}
-html,body{height:100%;margin:0;background:#050609;color:var(--fg);font-family:-apple-system,"SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{height:var(--full-h,100%);min-height:100%;margin:0;background:#050609;color:var(--fg);font-family:-apple-system,"SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 #c{display:block;width:100%;height:100%}
 #ttl{position:fixed;left:0;right:0;top:30px;text-align:center;pointer-events:none;transition:opacity .8s}
 #ttl b{display:block;font-size:12px;font-weight:300;letter-spacing:.42em;text-indent:.42em;opacity:.7}
@@ -38,9 +52,9 @@ html,body{height:100%;margin:0;background:#050609;color:var(--fg);font-family:-a
 .row{position:fixed;left:8px;top:18px;display:flex;flex-direction:column;align-items:flex-start;transition:opacity .8s}
 .bt{padding:14px 18px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);cursor:pointer;transition:color .2s}
 .bt:active,.bt.on{color:var(--fg)}
-#start{position:fixed;inset:0;z-index:5;background:#050609;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 26px;transition:opacity .9s}
+#start{position:fixed;inset:0;height:var(--full-h,100%);z-index:5;background:#050609;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 26px;transition:opacity .9s}
 #start.off{opacity:0;pointer-events:none}
-#pause{position:fixed;inset:0;z-index:6;background:rgba(5,6,9,.78);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s}
+#pause{position:fixed;inset:0;height:var(--full-h,100%);z-index:6;background:rgba(5,6,9,.78);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s}
 #pause.on{opacity:1;pointer-events:auto}
 #pause h2{margin:0;font-size:clamp(30px,8vmin,54px);font-weight:100;letter-spacing:.3em;text-indent:.3em}
 #pause b{margin-top:30px;font-size:13px;font-weight:400;letter-spacing:.18em;animation:br 2.4s ease-in-out infinite}

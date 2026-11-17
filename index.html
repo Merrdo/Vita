@@ -63,11 +63,11 @@ html,body{height:var(--full-h,100%);min-height:100%;margin:0;background:#050609;
 #c{display:block;width:100%;height:100%;touch-action:none;-webkit-touch-callout:none}
 #h{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1}
 #ttl,.row{z-index:2}
-#ttl{position:fixed;left:0;right:0;top:30px;text-align:center;pointer-events:none;transition:opacity .8s}
-#ttl b{display:block;font-size:12px;font-weight:300;letter-spacing:.42em;text-indent:.42em;opacity:.7}
-#ttl i{display:block;margin-top:9px;font-style:normal;font-size:11px;font-weight:300;letter-spacing:.24em;text-indent:.24em;color:var(--dim)}
-.row{position:fixed;left:8px;top:18px;display:flex;flex-direction:column;align-items:flex-start;transition:opacity .8s}
-.bt{padding:14px 18px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);cursor:pointer;transition:color .2s}
+#ttl{position:fixed;left:0;right:0;top:16px;text-align:center;pointer-events:none;transition:opacity .8s}
+#ttl b{display:block;font-size:11px;font-weight:300;letter-spacing:.42em;text-indent:.42em;opacity:.7}
+#ttl i{display:block;margin-top:6px;font-style:normal;font-size:10px;font-weight:300;letter-spacing:.24em;text-indent:.24em;color:var(--dim)}
+.row{position:fixed;left:8px;top:8px;display:flex;flex-direction:column;align-items:flex-start;transition:opacity .8s}
+.bt{padding:9px 14px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);cursor:pointer;transition:color .2s}
 .bt:active,.bt.on{color:var(--fg)}
 #start{position:fixed;inset:0;height:var(--full-h,100%);z-index:5;background:#050609;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 26px;transition:opacity .9s}
 #start.off{opacity:0;pointer-events:none}
@@ -211,16 +211,16 @@ var JSK={m:{id:null,x:0,y:0,ox:0,oy:0},a:{id:null,x:0,y:0,ox:0,oy:0,fire:0}},use
 var AIM_DZ=.12,   /* sağ kol: bu orandan küçük itme yön vermez; dokunup kıpırdatınca hemen nişan */
     FIRE_ON=.78,  /* sağ kol: kol bu orana (dış kenara yakın) varınca ateş başlar */
     FIRE_OFF=.5;  /* ateş ancak bu oranın altına inince durur; arası geniş, ateş ederken parmak rahat gezer */
-function JR(){return Math.max(52,Math.min(78,Math.min(W,H)*.22))}
+function JR(){return Math.max(40,Math.min(50,Math.min(W,H)*.13))}
 function JT(){return JR()*.66}
 function JTA(){return JR()*.78}   /* sağ kol menzili: tutamaç halkanın en dışına kadar gider, ateş işaretleri orada */   /* kolun gidebileceği en uzak mesafe (tutamaç halkanın içinde kalır) */
-function LAY(){var r=JR(),mx=Math.max(28,W*.06),my=Math.max(22,H*.1);return{r:r,m:{x:mx+r,y:H-my-r},a:{x:W-mx-r,y:H-my-r}}}
+function LAY(){var r=JR(),mx=Math.max(24,W*.045),my=Math.max(18,H*.07);return{r:r,m:{x:mx+r,y:H-my-r},a:{x:W-mx-r,y:H-my-r}}}
 var rbP=0,swP=0;
 function aimC(){var l=LAY();return{x:l.a.x,y:l.a.y,r:l.r}}
 function moveC(){var l=LAY();return{x:l.m.x,y:l.m.y,r:l.r}}
-function btnAt(deg){var c=aimC(),br=Math.max(22,c.r*.4),d=c.r+br+16,a=deg*Math.PI/180;return{x:c.x+Math.cos(a)*d,y:c.y+Math.sin(a)*d,r:br}}
-function rlB(){return btnAt(168)}
-function swB(){return btnAt(216)}
+function btnAt(deg){var c=aimC(),br=Math.max(17,c.r*.38),d=c.r+br+10,a=deg*Math.PI/180;return{x:c.x+Math.cos(a)*d,y:c.y+Math.sin(a)*d,r:br}}
+function rlB(){return btnAt(180)}
+function swB(){return btnAt(228)}
 function syncSticks(){var l=LAY();JSK.m.ox=l.m.x;JSK.m.oy=l.m.y;JSK.a.ox=l.a.x;JSK.a.oy=l.a.y}
 function stFor(id){return JSK.m.id===id?JSK.m:JSK.a.id===id?JSK.a:null}
 function stSet(t,x,y){var q=cv.getBoundingClientRect();t.x=x-q.left;t.y=y-q.top;syncSticks()}
@@ -688,7 +688,7 @@ var Wpn=(function(){
   pbr.style.cssText='position:fixed;right:0;top:0;width:env(safe-area-inset-right,0px);height:1px;visibility:hidden;pointer-events:none';
   document.body.appendChild(pbe);document.body.appendChild(pbr);
   function lay(){var k=W+'x'+H;if(k!==lk||++lc>90){lc=0;lk=k;sl=pbe.offsetWidth||0;sb=pbe.offsetHeight||0;sr=pbr.offsetWidth||0}
-    u=Math.max(.82,Math.min(1.2,Math.min(W,H)/380));PW=BW*u;PH=BH*u;px=Math.round((W-Math.max(14,sr)-PW)*HP)/HP;py=18}
+    u=Math.max(.6,Math.min(.78,Math.min(W,H)/500));PW=BW*u;PH=BH*u;px=Math.round((W-Math.max(14,sr)-PW)*HP)/HP;py=14}
   function ease(p){return p*p*(3-2*p)}
   function shown(){var w=L[i],s=st[i];return s.rl>0?s.a0+(s.tg-s.a0)*ease(1-s.rl/w.rel):s.a}
   function q(v){var z=u*HP;return Math.round(v*z)/z}
@@ -739,7 +739,7 @@ var Wpn=(function(){
 
 var mmRow=null,mmRowX=-1;
 function drawMini(){
-  var sz=Math.round(Math.max(72,Math.min(112,Math.min(W,H)*.29))),X0=Math.round(Math.max(14,Wpn.rect().sl+8)),Y0=22,i,x,y,t,v,k,u,ox,oy,fd=[],
+  var sz=Math.round(Math.max(58,Math.min(84,Math.min(W,H)*.22))),X0=Math.round(Math.max(12,Wpn.rect().sl+8)),Y0=14,i,x,y,t,v,k,u,ox,oy,fd=[],
     bx0=1e9,bx1=-1,by0=1e9,by1=-1,tx,ty,ts,pxx,pyy,pp,ls;
   for(i=0;i<MW*MH;i++)if(rv[i]>.05){x=i%MW;y=(i/MW)|0;if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y}
   x=pl.x|0;y=pl.y|0;if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y;
@@ -797,12 +797,12 @@ function drawStick(t){var c=moveC(),r=c.r,tr=JT(),on=t.id!==null,kx=c.x,ky=c.y,d
 function drawAim(t){var c=aimC(),r=c.r,tr=JTA(),on=t.id!==null,hot=!!t.fire,kx=c.x,ky=c.y,dx,dy,l,k=0,sp;
   if(on){dx=t.x-c.x;dy=t.y-c.y;l=Math.hypot(dx,dy)||1;k=Math.min(1,l/tr);l=Math.min(l,tr)/l;kx=c.x+dx*l;ky=c.y+dy*l}
   cx.save();cx.lineCap='round';
-  sp=bloom*r*2.2;if(hot||bloom>.003){cx.lineWidth=1.4;cx.strokeStyle=C_ORGD;cx.beginPath();cx.arc(c.x,c.y,r+5+sp,0,6.2832);cx.stroke()}
+  sp=bloom*r*2.2;if(hot||bloom>.003){cx.lineWidth=1.4;cx.strokeStyle=C_ORGD;cx.beginPath();cx.arc(c.x,c.y,r+4+sp,0,6.2832);cx.stroke()}
   disc(c.x,c.y,r,hot?C_ORGBG:C_BG,hot?C_ORG:on?'#5b6682':C_RING,hot?2.2:1.8);
   /* ateş işaretleri: nişan alırken dış kenarda belirir; kolu oraya sürükleyince ateş başlar */
   if(on&&k>AIM_DZ){var ft=Math.min(1,(k-AIM_DZ)/.5),fc=mixc(C_RING2,hot?C_ORG:C_ORGD,hot?1:ft),i,a,ca,sa2;
     cx.lineWidth=hot?2.6:2;cx.strokeStyle=fc;cx.beginPath();
-    for(i=0;i<28;i++){a=i/28*6.2832;ca=Math.cos(a);sa2=Math.sin(a);cx.moveTo(c.x+ca*(tr-6),c.y+sa2*(tr-6));cx.lineTo(c.x+ca*(tr+6),c.y+sa2*(tr+6))}
+    for(i=0;i<28;i++){a=i/28*6.2832;ca=Math.cos(a);sa2=Math.sin(a);cx.moveTo(c.x+ca*(tr-4.5),c.y+sa2*(tr-4.5));cx.lineTo(c.x+ca*(tr+4.5),c.y+sa2*(tr+4.5))}
     cx.stroke()}
   if(on&&k>AIM_DZ){cx.lineWidth=1.5;cx.strokeStyle=hot?C_ORGD:C_RING;cx.beginPath();cx.moveTo(c.x,c.y);cx.lineTo(kx,ky);cx.stroke()}
   disc(kx,ky,r*.27,hot?C_ORGBG:on?C_ACT:C_KNOB,hot?C_ORG:on?C_HI:C_KR,2);disc(kx,ky,2,hot?C_ORG:on?C_HI:C_KR);

@@ -20,8 +20,14 @@
     var scr=land?Math.min(sh,sw):Math.max(sh,sw);
     var h=Math.max(ih,document.documentElement.clientHeight,scr);
     document.documentElement.style.setProperty('--full-h',h+'px');
+    /* yatay/dikey uyarısı: bazı iOS durumlarında orientation medya sorgusu açılışta yanlış kalıyor, boyuttan da karar ver */
+    var cl=document.documentElement.classList,pt=ih>=iw;
+    cl.toggle('pt',pt);cl.toggle('ls',!pt);
   }
   fh();
+  setTimeout(fh,100);setTimeout(fh,400);setTimeout(fh,1200);
+  window.addEventListener('pageshow',fh);
+  window.addEventListener('load',fh);
   window.addEventListener('resize',fh);
   window.addEventListener('orientationchange',function(){setTimeout(fh,250)});
 })();
@@ -39,6 +45,8 @@ window.ZDEV=(function(){try{return localStorage.getItem('vita_dev')!=='0'}catch(
 #rot b{margin-top:26px;font-size:13px;font-weight:400;letter-spacing:.18em;opacity:.7}
 @keyframes rt{0%,25%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
 @media (orientation:portrait){#rot{display:flex}}
+html.pt #rot{display:flex}
+html.ls #rot{display:none}
 </style>
 
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">

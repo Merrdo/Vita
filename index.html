@@ -12,10 +12,16 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>
+/* geliştirici modu: fps / ms göstergesi + "yeni kat" düğmesi (hub'daki ZDEV ile aynı). Varsayılan açık; başlangıç ekranındaki yazıdan değişir. */
+window.ZDEV=(function(){try{return localStorage.getItem('vita_dev')!=='0'}catch(e){return true}})();
+</script>
 <style>
 /* yatay yönlendirme uyarısı: yalnızca dikey duruşta görünür */
 #rot{position:fixed;inset:0;z-index:99;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#f4f2ee;font-family:-apple-system,"SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;touch-action:none}
 #rot svg{width:64px;height:64px;animation:rt 2.8s ease-in-out infinite}
+#dvt{position:absolute;left:0;right:0;bottom:calc(var(--sab,env(safe-area-inset-bottom,0px)) + 12px);padding:12px 0;font-size:10px;letter-spacing:.22em;text-indent:.22em;text-transform:uppercase;color:rgba(244,242,238,.36);cursor:pointer}
+#dvt:active{color:#f4f2ee}
 #rot b{margin-top:26px;font-size:13px;font-weight:400;letter-spacing:.18em;opacity:.7}
 @keyframes rt{0%,25%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
 @media (orientation:portrait){#rot{display:flex}}
@@ -52,6 +58,12 @@ html,body{height:100%;margin:0;background:#050609;color:var(--fg);font-family:-a
 (function(){
   function lock(){try{var o=screen.orientation;if(o&&o.lock)o.lock('landscape').catch(function(){})}catch(e){}}
   window.addEventListener('pointerdown',lock,{once:true});
+  var dv=document.getElementById('dvt');
+  if(dv){
+    dv.textContent='Geliştirici: '+(window.ZDEV?'açık':'kapalı');
+    dv.addEventListener('pointerdown',function(e){e.stopPropagation()});
+    dv.addEventListener('pointerup',function(e){e.stopPropagation();try{localStorage.setItem('vita_dev',window.ZDEV?'0':'1')}catch(_){}location.reload()});
+  }
   if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){navigator.serviceWorker.register('sw.js').catch(function(){})}
 })();
 </script>
@@ -59,7 +71,7 @@ html,body{height:100%;margin:0;background:#050609;color:var(--fg);font-family:-a
 <div id="ttl"><b>VITA</b><i id="sub">kat 1</i></div>
 <div class="row"><div class="bt" id="ps">duraklat</div><div class="bt" id="nf" style="display:none">yeni kat</div></div>
 <div id="pause"><h2>DURAKLADI</h2><b>DOKUN, DEVAM ET</b></div>
-<div id="start"><h1>VITA</h1><p>Sol taraf: yürü<br>Sağ taraf: nişan al ve ateş et</p><b>DOKUN, BAŞLA</b></div>
+<div id="start"><h1>VITA</h1><p>Sol taraf: yürü<br>Sağ taraf: nişan al ve ateş et</p><b>DOKUN, BAŞLA</b><span id="dvt"></span></div>
 <script>
 (function(){
 var cv=document.getElementById('c'),cx=cv.getContext('2d'),W,H,S,DPR=1,HD=10;

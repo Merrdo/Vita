@@ -47,7 +47,7 @@ const R=[],DOORS=[];
 const carve=(x,y,w,h,v=0)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)g[j*W+i]=v};
 const room=(n,x,y,w,h,k,c,a)=>{carve(x,y,w,h);R.push({n,x,y,w,h,k,c,a})};
 const DR=[],HT=4,DLH=32-HT; // HT: yaprak yarı kalınlığı, DLH: menteşenin kapı merkezine uzaklığı
-const door=(x,y,w,h,ax)=>{carve(x,y,w,h);DOORS.push([x,y,w,h]);DR.push({ns:ax==='ns',cx:(x+w/2)*TS,cy:(y+h/2)*TS,p:0,s:1,t:0,lc:1,lf:[],sg:[]})};
+const door=(x,y,w,h,ax)=>{carve(x,y,w,h);DOORS.push([x,y,w,h]);DR.push({ns:ax==='ns',cx:(x+w/2)*TS,cy:(y+h/2)*TS,p:0,s:1,t:0,lc:1,lf:[],sg:[],h:0})};
 /* Kapı: koridorun tam ortasında çift kanat. Her kanat kendi duvarına menteşeli, oyuncudan uzağa (giriş yönünde) 90° dönüp duvara yaslanır.
    p: açıklık 0..1 · s: kanatların savrulduğu yön (±1) · t: hedef · lc: ışık için kapalı mı */
 function dgeo(D){const th=D.p*D.p*(3-2*D.p)*Math.PI/2,c=Math.cos(th),sn=Math.sin(th),P=D.ns?[1,0]:[0,1],Tx=D.ns?0:D.s,Ty=D.ns?D.s:0;
@@ -78,6 +78,47 @@ door(14,11,2,3,'ns');door(25,11,2,3,'ns');door(36,11,2,3,'ns');
 door(14,16,2,2,'ns');door(26,16,2,2,'ns');door(38,16,2,2,'ns');
 door(19,6,3,2,'ew');door(31,7,3,2,'ew');door(19,21,3,2,'ew');door(32,22,3,2,'ew');door(47,14,1,2,'ew');door(47,5,1,2,'ew');
 door(4,10,2,1,'ns');door(10,6,1,2,'ew');door(4,19,2,2,'ns');door(10,24,1,2,'ew');door(45,11,2,3,'ns');door(44,16,2,2,'ns');door(47,24,1,2,'ew');
+DR.forEach(dgeo); /* kapalı kapılar baştan çizilsin ve katı olsun */
+/* ───────── Kapı türleri ─────────
+   Her tür: malzeme renkleri, cam bölmeleri, kol tipi, açılma/kapanma süresi ve dayanıklılık (hp).
+   Kapı durumu: lk = kilitli, bk = kilit kırık, hp = kapı dayanıklılığı, sh = sarsıntı, gs[kanat][bölme] = {hp,br} cam bölme durumu.
+   İleride: doorLock / doorKick / doorGlassHit çağrıları (silah, tekme, patlama) bu alanları değiştirir; çizim ve hareket zaten bunları okur. */
+const DT={
+ office:{c1:'#ebe5d8',c2:'#c2bba9',rim:'#fffaf0',ol:'#4a463d',jm:'#5a5f69',hg:'#8f96a3',hr:1.8,o:.26,cl:.5,hp:70,gl:[[6,16]],gv:1.5,gh:30,gt:'120,190,226',hd:'lever',hc:'#a4abb7'},
+ glass:{c1:'#b4c2c9',c2:'#8396a1',rim:'#e8f1f5',ol:'#3d4a52',jm:'#3f4a52',hg:'#6f7d86',hr:1.6,o:.24,cl:.45,hp:40,gl:[[3.5,21]],gv:2.7,gh:18,gt:'130,200,235',hd:'pull',hc:'#cfd8de'},
+ steel:{c1:'#76827a',c2:'#4f5a54',rim:'#a7b3ab',ol:'#1f2622',jm:'#30363a',hg:'#2b302d',hr:2.2,o:.34,cl:.6,hp:160,gl:[[12,6]],gv:1,gh:40,gt:'120,190,226',hd:'lever',hc:'#2c3330',riv:1,haz:1},
+ wood:{c1:'#94683f',c2:'#613f25',rim:'#c79865',ol:'#2a190d',jm:'#3a2a1e',hg:'#b08d54',hr:2,o:.3,cl:.55,hp:100,gl:[],gv:0,gh:0,gt:'',hd:'knob',hc:'#c4a064',pan:1},
+ vault:{c1:'#59606b',c2:'#343a43',rim:'#8e97a6',ol:'#101318',jm:'#22262d',hg:'#161a1f',hr:3,o:.6,cl:.9,hp:500,gl:[],gv:0,gh:0,gt:'',hd:'bolt',hc:'#c0832e',riv:1}
+};
+const DTY={'14,11':'steel','25,11':'glass','36,11':'office','14,16':'wood','26,16':'steel','38,16':'office',
+ '19,6':'steel','31,7':'glass','19,21':'steel','32,22':'office','47,14':'vault','47,5':'glass',
+ '4,10':'glass','10,6':'office','4,19':'steel','10,24':'wood','45,11':'glass','44,16':'wood','47,24':'steel'};
+function doorInit(D,t){const Y=DT[t]||DT.office;D.ty=t;D.Y=Y;D.hp=Y.hp;D.lk=0;D.bk=0;D.sh=0;D.fo=0;D.gs=[0,1].map(()=>Y.gl.map(()=>({hp:Y.gh,br:0})))}
+DR.forEach((D,i)=>{const o=DOORS[i];doorInit(D,'wood')});
+const doorLock=(D,on)=>{D.lk=on?1:0};
+/* Kilitli kapılar: otomatik açılmaz; tekme (F / TEKME düğmesi), kurşun ya da el bombasıyla kırılır. Giriş ve ana koridor açık kalır, böylece oyuncu hiçbir zaman sıkışmaz. */
+const LOCKED=new Set(['14,11','26,16','31,7','32,22','10,24','44,16','47,24','19,21']);
+DR.forEach((D,i)=>{const o=DOORS[i];if(LOCKED.has(o[0]+','+o[1]))doorLock(D,1)});
+const DPOW={ak47:12,pistol:9,sniper:40}; /* mermi başına kapı hasarı */
+
+/* tekme/darbe: fx,fy vuranın konumu. Kilitliyse önce kilit/kapı dayanıklılığı düşer; kırılınca kapı hızla açılır. 0=etkisiz 1=sarsıldı 2=açıldı */
+function doorKick(D,fx,fy,pow){D.sh=.3;if(D.lk){D.hp-=pow;if(D.hp>0)return 1;D.lk=0;D.bk=1}
+ if(D.p===0)D.s=(D.ns?fy-D.cy:fx-D.cx)<0?1:-1;D.t=1;D.h=1.2;D.fo=.1;return 2}
+/* cam bölmeye hasar: 0=yok 1=çatladı 2=kırıldı */
+function doorGlassHit(D,li,pi,dmg){const g=D.gs[li]&&D.gs[li][pi];if(!g||g.br)return 0;g.hp-=dmg;if(g.hp<=0){g.br=1;return 2}return 1}
+/* kapıya hasar: her kapı (kilitli ya da değil) kurşun ve patlamayla kırılır. Dayanıklılık bitince kapı cam gibi parçalanır. */
+function doorHurt(D,fx,fy,pow){if(D.dead)return 0;const S=Nade.sfx;D.hp-=pow;D.sh=.3;
+ if(D.hp>0){S.noise(.1,.5,1800,260,'lowpass');S.tone(120,60,.08,.35,'square');return 1}
+ doorShatter(D,fx,fy);return 2}
+/* parçalanma: iki kanat da kıvılcım gibi tahta kırıklarına dönüp vuruş yönünün ters tarafına savrulur; kapı çerçevesi kalır, geçit açılır */
+function doorShatter(D,fx,fy){const S=Nade.sfx,base=Math.atan2(D.cy-fy,D.cx-fx),cols=['148,104,63','112,74,42','176,132,84','84,54,30'];
+ for(const k of D.lf){for(let u=0;u<=DLH;u+=2.4){for(let n=0;n<3;n++){
+  const v=(Math.random()-.5)*HT*1.8,a=base+(Math.random()-.5)*2.4,sp=70+Math.random()*290,big=Math.random()<.18;
+  SHD.push({x:k.hx+k.lx*u+k.vx*v,y:k.hy+k.ly*u+k.vy*v,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,a:Math.random()*6,w:(Math.random()-.5)*(big?10:22),r:big?2.4+Math.random()*2.2:.8+Math.random()*1.5,l:30+Math.random()*25,t:big?4:3+(Math.random()*2|0),c:cols[Math.random()*4|0]})}}}
+ D.dead=1;D.lk=0;D.bk=0;D.t=0;D.p=1;D.h=0;D.lc=0;D.lf=[];D.sg=[];relight(D);
+ S.noise(.6,.9,3200,90,'lowpass');S.tone(170,35,.45,.75,'sawtooth');S.noise(.25,.5,8000,1200,'highpass');S.vib([35,20,80])}
+function doorNear(x,y,rad){let B=null,bd=rad;for(const D of DR){if(D.p>.05||Math.abs(x-D.cx)>80||Math.abs(y-D.cy)>80)continue;
+ for(let i=0;i<D.sg.length;i+=4){const d=segDist(x,y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3]);if(d<bd){bd=d;B=D}}}return B}
 DR.forEach(dgeo);
 
 /* [tür,x,y,w,h] */
@@ -462,7 +503,7 @@ function glassDraw(c){const now=performance.now(),dt=Math.min(.05,(now-_gt)/1000
     c.strokeStyle='rgba(110,170,205,.45)';c.lineWidth=2.2;c.stroke();c.strokeStyle='rgba(244,253,255,.92)';c.lineWidth=1;c.stroke();c.lineCap='butt'}
    c.restore()}}
  for(let i=SHD.length-1;i>=0;i--){const p=SHD[i];p.l-=dt;if(p.o&&p.y<(WIN.y+.5)*TS-3)p.l=Math.min(p.l,.3);if(p.l<=0){SHD.splice(i,1);continue}const f=Math.exp(-dt*2.4);p.vx*=f;p.vy*=f;p.x+=p.vx*dt;p.y+=p.vy*dt;p.a+=p.w*dt*f;
-  c.fillStyle='rgba(185,228,245,'+Math.min(.6,p.l)+')';c.beginPath();{const n=p.t||3;for(let k=0;k<n;k++){const a=p.a+k*6.283/n,rr=p.r*(k%2?.6:1.35);k?c.lineTo(p.x+Math.cos(a)*rr,p.y+Math.sin(a)*rr):c.moveTo(p.x+Math.cos(a)*rr,p.y+Math.sin(a)*rr)}}c.fill()}
+  c.fillStyle=p.c?'rgba('+p.c+','+Math.min(.95,p.l)+')':'rgba(185,228,245,'+Math.min(.6,p.l)+')';c.beginPath();{const n=p.t||3;for(let k=0;k<n;k++){const a=p.a+k*6.283/n,rr=p.r*(k%2?.6:1.35);k?c.lineTo(p.x+Math.cos(a)*rr,p.y+Math.sin(a)*rr):c.moveTo(p.x+Math.cos(a)*rr,p.y+Math.sin(a)*rr)}}c.fill()}
  if(SHD.length>500)SHD.splice(0,SHD.length-500)}
 function lampFx(c,pv){c.save();path(c,pv);c.clip();c.globalCompositeOperation='lighter';
  for(const l of L){const i=Math.min(1,l.i);if(i<.03||l.nb)continue;if(Math.abs(l.x*TS-pl.x)>560||Math.abs(l.y*TS-pl.y)>400)continue;
@@ -481,30 +522,90 @@ let pvx=0,pvy=0,ppx=null,ppy=0;
 const segDist=(px,py,x1,y1,x2,y2)=>{const ex=x2-x1,ey=y2-y1,l2=ex*ex+ey*ey;let t=l2?((px-x1)*ex+(py-y1)*ey)/l2:0;t=t<0?0:t>1?1:t;return Math.hypot(px-x1-ex*t,py-y1-ey*t)};
 function dHit(x,y){const R=pl.r+HT-1;for(const D of DR){if(Math.abs(x-D.cx)>80||Math.abs(y-D.cy)>80)continue;
  for(let i=0;i<D.sg.length;i+=4){const dn=segDist(x,y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3]);if(dn<R&&(dn<segDist(pl.x,pl.y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3])-.01||segDist(pl.x,pl.y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3])>=R))return true}}return false}
-function relight(D){const keep=SEG;SEG=lightSegs();
- for(let i=0;i<L.length;i++){const l=L[i];if(Math.hypot(l.x*TS-D.cx,l.y*TS-D.cy)<l.r*TS+72){LPS[i]=lampPolys(l);LP[i]=LPS[i][0][0]}}
- SEG=keep;const m=L.reduce((a,l)=>Math.max(a,l.r),0)*TS;updateRegion(D.cx-m,D.cy-m,D.cx+m,D.cy+m)}
+/* Işık yeniden pişirme: kapı açılıp kapanınca (ya da lamba kırılınca) ışık dokusu tek karede değil, karelere yayılarak güncellenir.
+   Kapıya en yakın karolar önce yenilenir → ışık kapıdan dışarı doğru akar, takılma olmaz. */
+const RQ=new Map(),RTS=96,PLQ=new Set();let RQx=0,RQy=0;
+function queueRegion(x0,y0,x1,y1,fx,fy){RQx=fx;RQy=fy;
+ for(let ty=Math.floor(y0/RTS);ty<=Math.floor(y1/RTS);ty++)for(let tx=Math.floor(x0/RTS);tx<=Math.floor(x1/RTS);tx++)RQ.set(tx+','+ty,[tx*RTS,ty*RTS])}
+const inPoly=(p,x,y)=>{let c=false;for(let i=0,j=p.length-2;i<p.length;i+=2){const xi=p[i],yi=p[i+1],xj=p[j],yj=p[j+1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;j=i}return c};
+/* yalnızca ışık çokgeni gerçekten değişen karolar kuyruğa girer (blur payı kadar genişletilmiş örnekleme) */
+function diffTiles(l,a,b){const R0=l.r*TS,lx=l.x*TS,ly=l.y*TS,M=48;
+ for(let ty=Math.floor((ly-R0)/RTS);ty<=Math.floor((ly+R0)/RTS);ty++)for(let tx=Math.floor((lx-R0)/RTS);tx<=Math.floor((lx+R0)/RTS);tx++){
+  const X=tx*RTS,Y=ty*RTS;if(Math.hypot(Math.max(X-lx,0,lx-X-RTS),Math.max(Y-ly,0,ly-Y-RTS))>R0+M)continue;
+  let hit=false;for(let y=Y-M;y<=Y+RTS+M&&!hit;y+=20)for(let x=X-M;x<=X+RTS+M;x+=20)if(inPoly(a,x,y)!==inPoly(b,x,y)){hit=true;break}
+  if(hit)RQ.set(tx+','+ty,[X,Y])}}
+function relight(D){RQx=D.cx;RQy=D.cy;
+ for(let i=0;i<L.length;i++){const l=L[i];if(Math.hypot(l.x*TS-D.cx,l.y*TS-D.cy)<l.r*TS+72)PLQ.add(i)}}
+function lightPump(){
+ if(!PLQ.size&&!RQ.size)return;const t0=performance.now();
+ if(PLQ.size){const keep=SEG;SEG=lightSegs();
+  for(const i of PLQ){PLQ.delete(i);const l=L[i],o=LP[i];LPS[i]=lampPolys(l);LP[i]=LPS[i][0][0];diffTiles(l,o,LP[i]);if(performance.now()-t0>1.5)break}
+  SEG=keep;if(PLQ.size)return}
+ let n=0;while(RQ.size&&(n===0||performance.now()-t0<3.5)){let bk=null,bd=1e18;
+  for(const[k,v]of RQ){const d=Math.hypot(v[0]+RTS/2-RQx,v[1]+RTS/2-RQy);if(d<bd){bd=d;bk=k}}
+  const v=RQ.get(bk);RQ.delete(bk);updateRegion(v[0],v[1],v[0]+RTS,v[1]+RTS);n++}}
 function doorsUpdate(dt){
  if(ppx===null){ppx=pl.x;ppy=pl.y}
  if(dt>0){const k=Math.min(1,dt*20);pvx+=((pl.x-ppx)/dt-pvx)*k;pvy+=((pl.y-ppy)/dt-pvy)*k}ppx=pl.x;ppy=pl.y;
- for(const D of DR){
+ for(const D of DR){if(D.dead)continue;
   const dx=pl.x-D.cx,dy=pl.y-D.cy,ax=D.ns?dy:dx,pp=D.ns?dx:dy,va=-(ax<0?-1:1)*(D.ns?pvy:pvx),ds=ax<0?1:-1;
-  const trig=started&&Math.abs(pp)<34&&Math.abs(ax)<58&&(va>22||Math.abs(ax)<26);
-  if(trig){if(D.p===0){D.s=ds;D.t=1}else if(!D.t&&D.s===ds)D.t=1}
-  else if(D.t&&!(Math.abs(pp)<42&&ax*D.s<44&&ax*D.s>-66))D.t=0;
-  const pr=D.p;D.p=D.t?Math.min(1,D.p+dt/.28):Math.max(0,D.p-dt/.5);
+  const trig=started&&!D.lk&&Math.abs(pp)<38&&((va>22&&Math.abs(ax)<84)||Math.abs(ax)<32);
+  if(trig){D.h=.32;if(D.p===0){D.s=ds;D.t=1}else if(!D.t&&D.s===ds)D.t=1}
+  else if(D.t){if(Math.abs(pp)<44&&ax*D.s<46&&ax*D.s>-96)D.h=.32;else if((D.h-=dt)<=0)D.t=0} /* alana girince bekleme tazelenir, çıkınca kısa bir gecikmeyle kapanır (yüze çarpmaz) */
+  const pr=D.p,fc=trig&&D.p>0&&!D.t&&D.s!==ds; /* fc: karşı taraftan gelene, kapı hızlıca kapanıp yön değiştirir */
+  D.p=D.t?Math.min(1,D.p+dt/(D.fo||D.Y.o)):Math.max(0,D.p-dt/(fc?.2:D.Y.cl));if(D.p>=1)D.fo=0;if(D.sh>0)D.sh=Math.max(0,D.sh-dt);
   if(D.p!==pr||(D.p===0&&D.t))dgeo(D);
-  if(pr===0&&D.p>0){D.lc=0;relight(D)}else if(pr>0&&D.p===0){D.lc=1;relight(D)}}
+  /* kapıda ışık dokusu YENİDEN PİŞİRİLMEZ (büyük dokuyu değiştirmek GPU'ya yeniden yükleme = takılma). Doku kapalı kapılarla pişmiş kalır; açık kapıdan sızan ışık doorFx'te dinamik, yumuşak geçişle çizilir. */
+  D.lc=D.p>0?0:1;}
  SEG=[];for(const D of DR){if(D.p>=.999||Math.abs(D.cx-pl.x)>20*TS||Math.abs(D.cy-pl.y)>20*TS)continue;for(const v of D.sg)SEG.push(v)}}
-function drawDoors(c){c.save();c.lineJoin='round';
- for(const D of DR)for(const k of D.lf){const X=(u,v)=>k.hx+k.lx*u+k.vx*v,Y=(u,v)=>k.hy+k.ly*u+k.vy*v;
-  c.beginPath();c.moveTo(X(-HT,-HT),Y(-HT,-HT));c.lineTo(X(DLH,-HT),Y(DLH,-HT));c.lineTo(X(DLH,HT),Y(DLH,HT));c.lineTo(X(-HT,HT),Y(-HT,HT));c.closePath();
-  c.fillStyle='#232832';c.fill();c.strokeStyle='#737c90';c.lineWidth=.8;c.stroke();
-  c.strokeStyle='#8b744b';c.lineWidth=1;c.beginPath();c.moveTo(X(2,0),Y(2,0));c.lineTo(X(DLH-3,0),Y(DLH-3,0));c.stroke()}
+/* Kapı görünümü (üstten): türe göre malzeme, cam bölmeler, kol. Kanat yerel koordinatlarında çizilir (u: menteşeden uca, v: kalınlık). */
+function drawDoors(c,only){c.save();c.lineJoin='round';
+ for(const D of(only?[only]:DR)){const Y=D.Y,P=D.ns?[1,0]:[0,1],Tr=D.ns?[0,1]:[1,0],hw=DLH+HT,shk=D.sh>0?(Math.random()-.5)*2.4*D.sh:0;
+  c.save();c.translate(D.cx,D.cy);c.transform(P[0],P[1],Tr[0],Tr[1],0,0);
+  c.fillStyle='rgba(0,0,0,.24)';c.fillRect(-hw+4,-1.8,(hw-4)*2,3.6);
+  for(const q of[-1,1]){const x0=q>0?hw-5:-hw-.5;c.fillStyle=Y.jm;c.fillRect(x0,-5.5,5.5,11);c.fillStyle='rgba(255,255,255,.15)';c.fillRect(x0,-5.5,5.5,1);c.strokeStyle='rgba(0,0,0,.55)';c.lineWidth=.6;c.strokeRect(x0,-5.5,5.5,11)}
+  c.restore();
+  D.lf.forEach((k,li)=>{c.save();c.translate(k.hx,k.hy);c.transform(k.lx,k.ly,k.vx,k.vy,0,0);if(shk)c.translate(0,shk);
+   const a=-HT,len=DLH+HT,gB=c.createLinearGradient(0,-HT,0,HT);gB.addColorStop(0,Y.c1);gB.addColorStop(1,Y.c2);
+   c.fillStyle='rgba(0,0,0,.12)';c.fillRect(a-3,-HT-3,len+6,HT*2+6);c.fillStyle='rgba(0,0,0,.2)';c.fillRect(a-1.5,-HT-1.5,len+3,HT*2+3);
+   c.fillStyle=gB;c.fillRect(a,-HT,len,HT*2);
+   c.globalAlpha=.4;c.fillStyle=Y.rim;c.fillRect(a+.5,-HT+.4,len-1,1);c.globalAlpha=1;c.fillStyle='rgba(0,0,0,.26)';c.fillRect(a+.5,HT-1.3,len-1,1);
+   if(Y.pan){c.lineWidth=.7;c.strokeStyle='rgba(0,0,0,.4)';c.strokeRect(3,-2,DLH-6,4);c.strokeStyle='rgba(255,225,180,.28)';c.beginPath();c.moveTo(3,2);c.lineTo(3,-2);c.lineTo(DLH-3,-2);c.stroke()}
+   if(D.hp<Y.hp*.8){const dm=1-D.hp/Y.hp;c.strokeStyle='rgba(20,10,4,.8)';c.lineWidth=.6;c.beginPath();for(let m=0;m<2+dm*7;m++){const u=4+(m*7.3+li*3.1)%(DLH-8),w=(m%2?1:-1)*(1+(m*1.7)%2.5);c.moveTo(u,-HT);c.lineTo(u+w,-1);c.lineTo(u-w*.4,HT)}c.stroke()}
+   if(Y.riv){c.fillStyle='rgba(0,0,0,.45)';for(let u=3;u<DLH-5;u+=6){c.beginPath();c.arc(u,-HT+1.3,.5,0,7);c.arc(u,HT-1.3,.5,0,7);c.fill()}}
+   if(Y.haz){c.fillStyle='#a8913f';c.fillRect(DLH-4.5,-HT+.8,4.5,HT*2-1.6);c.strokeStyle='#24231b';c.lineWidth=1;c.beginPath();for(let u=DLH-4.5;u<DLH;u+=2.2){c.moveTo(u,-HT+.8);c.lineTo(u+1.7,HT-.8)}c.stroke()}
+   Y.gl.forEach((p,pi)=>{const u0=p[0],w=p[1],gv=Y.gv,g=D.gs[li][pi];
+    c.fillStyle='rgba(0,0,0,.5)';c.fillRect(u0-.6,-gv-.6,w+1.2,gv*2+1.2);
+    if(g.br){c.fillStyle='rgba(8,10,14,.9)';c.fillRect(u0,-gv,w,gv*2);c.fillStyle='rgba(235,248,255,.8)';c.beginPath();c.moveTo(u0,-gv);c.lineTo(u0+w*.22,-gv);c.lineTo(u0+w*.08,-gv*.1);c.moveTo(u0+w,gv);c.lineTo(u0+w*.72,gv);c.lineTo(u0+w*.9,gv*.2);c.fill();return}
+    c.fillStyle='rgba('+Y.gt+',.58)';c.fillRect(u0,-gv,w,gv*2);c.fillStyle='rgba(215,245,255,.3)';c.fillRect(u0,-gv,w,gv*.8);
+    c.strokeStyle='rgba(240,252,255,.6)';c.lineWidth=.6;c.beginPath();c.moveTo(u0+w*.25,gv*.8);c.lineTo(u0+w*.25+gv,-gv*.8);c.stroke();
+    if(g.hp<Y.gh*.7){c.strokeStyle='rgba(250,255,255,.85)';c.lineWidth=.5;c.beginPath();const cx=u0+w*.5;for(let m=0;m<5;m++){const an=m*1.26+.4;c.moveTo(cx,0);c.lineTo(cx+Math.cos(an)*w*.32,Math.sin(an)*gv)}c.stroke()}});
+   c.globalAlpha=.7;c.strokeStyle=Y.ol;c.lineWidth=.7;c.strokeRect(a,-HT,len,HT*2);c.globalAlpha=1;
+   c.fillStyle=Y.hg;c.beginPath();c.arc(0,0,Y.hr,0,7);c.fill();c.strokeStyle='rgba(0,0,0,.55)';c.lineWidth=.6;c.stroke();c.fillStyle='rgba(255,255,255,.3)';c.beginPath();c.arc(-.4,-.5,Y.hr*.35,0,7);c.fill();
+   c.fillStyle=Y.hc;
+   if(Y.hd==='lever'){c.fillRect(DLH-8.5,-HT-1.4,4,1.4);c.fillRect(DLH-8.5,HT,4,1.4)}
+   else if(Y.hd==='pull'){c.beginPath();c.arc(DLH-5.5,-HT-1.1,1.1,0,7);c.arc(DLH-5.5,HT+1.1,1.1,0,7);c.fill()}
+   else if(Y.hd==='knob'){c.beginPath();c.arc(DLH-5,-HT-1.3,1.5,0,7);c.arc(DLH-5,HT+1.3,1.5,0,7);c.fill();c.fillStyle='rgba(255,240,200,.5)';c.beginPath();c.arc(DLH-5.4,-HT-1.7,.5,0,7);c.arc(DLH-5.4,HT+.9,.5,0,7);c.fill()}
+   else if(Y.hd==='bolt'){c.beginPath();for(const u of[DLH-6,DLH-12,DLH-18])c.arc(u,0,1,0,7);c.fill();c.fillRect(DLH-1.6,-1.6,2,3.2)}
+   if(li===0&&D.lk){c.fillStyle='#d4483a';c.beginPath();c.arc(DLH-2.2,0,1.2,0,7);c.fill()}
+   if(li===0&&D.bk){c.fillStyle='#0b0b0b';c.fillRect(DLH-3.2,-1.6,3.2,3.2)}
+   c.restore()})}
  c.restore()}
+/* Kapının bulunduğu yerdeki ışık: lambalardan (duvar arkası sayılmaz) ve oyuncu fenerinden analitik olarak toplanır → kapı gerçek ışığıyla loşlaşır ve lamba renginde boyanır */
+const DSC=document.createElement('canvas'),dsx=DSC.getContext('2d');
+function doorLight(D,fx,fy){let sI=0,r=0,g=0,b=0;
+ for(const l of L){const k=l.on?1:l.i;if(k<.05)continue;const lx=l.x*TS,ly=l.y*TS,d=Math.hypot(lx-D.cx,ly-D.cy),R0=l.r*TS;if(d>=R0)continue;
+  if(d>10&&ddaG(lx,ly,Math.atan2(D.cy-ly,D.cx-lx),d)<d-10)continue;
+  const t=d/R0,I=Math.max(0,(1/(1+9.8*t*t)-.093)/.907)*l.al*k,c=l.cc||(l.cc=l.c.split(',').map(Number));sI+=I;r+=c[0]*I;g+=c[1]*I;b+=c[2]*I}
+ const dd=Math.hypot(D.cx-fx,D.cy-fy);if(dd<8*TS){const I=.4*(1-dd/(8*TS));sI+=I;r+=205*I;g+=220*I;b+=240*I}
+ return sI>0?{L:Math.min(1,sI),c:(r/sI|0)+','+(g/sI|0)+','+(b/sI|0)}:{L:0,c:'120,140,180'}}
+/* kasa pilot ışıkları: kapalıyken sıcak amber, açıkken yeşil (kırmızı alarm ışığı yok) */
 function doorFx(c,pv){c.save();path(c,pv);c.clip();c.globalCompositeOperation='lighter';
- for(const D of DR){if(Math.abs(D.cx-pl.x)>560||Math.abs(D.cy-pl.y)>400)continue;const k=D.lf[0],x=k.hx+k.lx*DLH,y=k.hy+k.ly*DLH,col=D.p<.5?'255,70,50':'80,255,140',g2=c.createRadialGradient(x,y,0,x,y,8);
-  g2.addColorStop(0,'rgba('+col+',.55)');g2.addColorStop(1,'rgba('+col+',0)');c.fillStyle=g2;c.fillRect(x-8,y-8,16,16);c.fillStyle='rgba('+col+',.95)';c.fillRect(x-1,y-1,2,2)}
+ for(const D of DR){if(D.dead||Math.abs(D.cx-pl.x)>560||Math.abs(D.cy-pl.y)>400)continue;
+  const P=D.ns?[1,0]:[0,1],T=D.ns?[0,1]:[1,0],th=D.p*D.p*(3-2*D.p),col=D.lk?'255,84,70':th<.5?'255,176,72':'96,255,168',hw=DLH+HT;
+  if(th>.01){for(const sd of[-1,1]){const x=D.cx+T[0]*sd*20,y=D.cy+T[1]*sd*20,sp=c.createRadialGradient(x,y,0,x,y,62);
+    sp.addColorStop(0,'rgba(255,226,180,'+.2*th+')');sp.addColorStop(1,'rgba(255,226,180,0)');c.fillStyle=sp;c.fillRect(x-62,y-62,124,124)}}
+  {const x=D.cx-P[0]*(hw-2),y=D.cy-P[1]*(hw-2),g2=c.createRadialGradient(x,y,0,x,y,7);g2.addColorStop(0,'rgba('+col+',.4)');g2.addColorStop(1,'rgba('+col+',0)');c.fillStyle=g2;c.fillRect(x-7,y-7,14,14);c.fillStyle='rgba('+col+',.9)';c.fillRect(x-.8,y-.8,1.6,1.6)}}
  c.restore()}
 
 /* ───────── Silah paneli (referans dosyadan aynen) ───────── */
@@ -1004,9 +1105,9 @@ const Hero=(function(){
  function shot(){const w=FW[s.sh],_z=s.sh==='sniper'?(s.lza=0):0,a=s.sh==='sniper'&&s.la!=null?s.la:s.ma+rn()*w.sp;s.k=Math.min(1.3,s.k+w.im);s.rj=s.rj*.4+rn()*.6;s.fl=1;s.ls=1;s.lg=Math.min(1,s.lg+.3);s.fs=.85+Math.random()*.5;
   smk.push({x:s.mx,y:s.my,vx:Math.cos(a)*24+rn()*10,vy:Math.sin(a)*24+rn()*10,r:2,t:.85,m:.85});if(smk.length>40)smk.shift();
   /* gerçek mermi: namludan çıkıp hızla uçar; çarpma (kıvılcım, lamba kırılması) ancak ulaşınca olur */
-  if(s.bk)trc.push({x0:s.bx,y0:s.by,c:Math.cos(a),n:Math.sin(a),d:0,p:0,v:w.bv,l:w.bl,hit:true,lamp:null,a:a});
+  if(s.bk)trc.push({x0:s.bx,y0:s.by,c:Math.cos(a),n:Math.sin(a),d:0,p:0,v:w.bv,l:w.bl,hit:true,lamp:null,a:a,pw:DPOW[s.sh]||6});
   else{let d=dda(s.mx,s.my,a,900);const lh=lampHit(s.mx,s.my,a,d);if(lh)d=lh.t;
-   trc.push({x0:s.mx,y0:s.my,c:Math.cos(a),n:Math.sin(a),d:d,p:0,v:w.bv*(.95+Math.random()*.1),l:w.bl,hit:d<899,lamp:lh?lh.l:null,a:a})}
+   trc.push({x0:s.mx,y0:s.my,c:Math.cos(a),n:Math.sin(a),d:d,p:0,v:w.bv*(.95+Math.random()*.1),l:w.bl,hit:d<899,lamp:lh?lh.l:null,a:a,pw:DPOW[s.sh]||6})}
   /* namlu ağzından fırlayan birkaç kızgın kıvılcım */
   if(!s.bk)for(let i=0;i<3;i++){const b=a+rn()*.4,v=140+Math.random()*140;spk.push({x:s.mx,y:s.my,vx:Math.cos(b)*v,vy:Math.sin(b)*v,t:.08+Math.random()*.1})}
   /* bu atışın parlama şekli: sivri ışınlar (her atışta farklı, kare kare titremez) */
@@ -1044,6 +1145,7 @@ const Hero=(function(){
    if(b.p>=b.d){const ix=b.x0+b.c*b.d,iy=b.y0+b.n*b.d;
     if(b.hit){imp.push({x:ix,y:iy,t:.1});for(let k=0;k<8;k++){const q=b.a+Math.PI+rn()*1.3,v=60+Math.random()*150;spk.push({x:ix,y:iy,vx:Math.cos(q)*v,vy:Math.sin(q)*v,t:.18+Math.random()*.14})}}
     if(b.lamp&&b.lamp.on)breakLamp(b.lamp,b.a);
+    if(b.hit){const Dd=doorNear(ix,iy,6);if(Dd){doorHurt(Dd,b.x0,b.y0,b.pw)}}
     trc.splice(i,1)}}
   for(let i=imp.length-1;i>=0;i--)if((imp[i].t-=dt)<=0)imp.splice(i,1);
   for(let i=spk.length-1;i>=0;i--){const p=spk[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.exp(-dt*6);p.vy*=Math.exp(-dt*6);if((p.t-=dt)<=0)spk.splice(i,1)}}
@@ -1202,6 +1304,7 @@ const Nade=(function(){
   for(let i=0;i<38;i++){const a=Math.random()*6.28,v=110+Math.random()*300;PT.push({x:x,y:y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,t:.25+Math.random()*.35})}
   for(let i=0;i<18;i++){const a=Math.random()*6.28,v=20+Math.random()*60,m=.9+Math.random()*.9;SK.push({x:x,y:y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,r:5,t:m,m:m})}
   const gr=s.createRadialGradient(x,y,0,x,y,38);gr.addColorStop(0,'rgba(0,0,0,.55)');gr.addColorStop(.6,'rgba(8,6,5,.28)');gr.addColorStop(1,'rgba(0,0,0,0)');s.fillStyle=gr;s.fillRect(x-38,y-38,76,76);
+  for(const D of DR){if(D.p>.05)continue;const dd=Math.hypot(D.cx-x,D.cy-y);if(dd<BR&&dda(x,y,Math.atan2(D.cy-y,D.cx-x),dd)>=dd-HT-DLH)doorHurt(D,x,y,Math.round(300*Math.max(.3,1-dd/BR)))}
   for(const l of L){if(!l.on||l.nb)continue;const lx0=l.x*TS,ly0=l.y*TS,dd=Math.hypot(lx0-x,ly0-y);if(dd<4.6*TS){const an=Math.atan2(ly0-y,lx0-x);if(dda(x,y,an,dd)>=dd-8)breakLamp(l,an)}}
   for(const o of TG){const dd=Math.hypot(o.x-x,o.y-y),R0=BR+(o.r||0);if(dd<R0&&dda(x,y,Math.atan2(o.y-y,o.x-x),dd)>=dd-(o.r||0)-4)o.hurt(Math.round(BDM*Math.max(.25,1-dd/R0)),x,y)}
   const dp=Math.hypot(x-pl.x,y-pl.y),vv=Math.max(.25,1-dp/(14*TS));shk=Math.max(shk,1.6*Math.max(0,1-dp/(10*TS)));
@@ -1292,7 +1395,7 @@ const Nade=(function(){
  function lights(){const o=BM.map(e=>({x:e.x,y:e.y,R:LR,I:Math.pow(Math.max(0,1-e.t/1.0),1.7),k:0,a:0,cw:.45,col:'255,150,70'}));
   for(const n of GL){const q=gI(n);o.push({x:n.x,y:n.y,R:(2.6+3*Math.sqrt(q.p))*TS,I:q.I,k:0,a:0,cw:.55,col:'255,236,200'})}
   if(hl>.03)o.push({x:pl.x+Math.cos(pl.a)*7,y:pl.y+Math.sin(pl.a)*7,R:3.1*TS,I:hl*.8,k:0,a:0,cw:.5,col:'255,236,200'});return o}
- return{update:update,draw:draw,fx:fx,hud:hud,lights:lights,unlock:unlock,targets:TG,fuse:fuseLeft,
+ return{update:update,draw:draw,fx:fx,hud:hud,lights:lights,unlock:unlock,targets:TG,fuse:fuseLeft,sfx:{tone:tone,noise:noise,vib:vib},
   get armed(){return ph===1},get hold(){return ph===1||ph===3},get wind(){return ph===3},get wa(){return wA},get aa(){return aimA},
   get wu(){return wu},get shx(){return shx},get shy(){return shy},get lx(){return lx},get ly(){return ly}}})();
 
@@ -1328,7 +1431,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/10
  // ışık: lambalar önce birikir, sonra oyuncunun görüş çokgeniyle kesilir (duvar ardı hiç aydınlanmaz)
  const ls=S/LD,tox=Math.floor(camx*ls),toy=Math.floor(camy*ls),sfx=camx*ls-tox,sfy=camy*ls-toy,tf=c=>c.setTransform(ls,0,0,ls,-tox,-toy),fx=pl.x,fy=pl.y;
  if(!lcReady){updateRegion(-MG,-MG,W*TS+MG,H*TS+MG);lcReady=true}
- while(LDIRTY.length){const l=LDIRTY.pop(),R0=l.r*TS;updateRegion(l.x*TS-R0,l.y*TS-R0,l.x*TS+R0,l.y*TS+R0)}
+ while(LDIRTY.length){const l=LDIRTY.pop(),R0=l.r*TS;queueRegion(l.x*TS-R0,l.y*TS-R0,l.x*TS+R0,l.y*TS+R0,l.x*TS,l.y*TS)}lightPump();
  const vx0=camx-300,vx1=camx+vw/Z+300,vy0=camy-300,vy1=camy+vh/Z+300;
  const pv=vis(fx,fy,15*TS,0,Math.PI);
  // hafıza: girdiğin odalar çok soluk silüet olarak kalır
@@ -1381,6 +1484,19 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/10
    const a=TALLA[i]+((ok?1:0)-TALLA[i])*fk;TALLA[i]=a<.01?0:a;if(a<.02)continue;
    const dd=Math.hypot(X+A/2-fx,Y+B/2-fy),al=Math.min(.72,.18+dd/(11*TS)*.6);
    ctx.globalAlpha=TALLA[i];ctx.drawImage(sc,(X-1)*SS,(Y-1)*SS,(A+3)*SS,(B+3)*SS,X-1,Y-1,A+3,B+3);ctx.fillStyle='rgba(2,3,7,'+al+')';ctx.fillRect(X-1,Y-1,A+3,B+3)}
+  /* KAPILAR: kanatlar görüşü kestiği için yalnızca bize bakan yüzleri aydınlanırdı. Bir yüzü görünen kapı bütün olarak, mesafeye göre loşlaşarak karanlığın üstüne çizilir. */
+  for(const D of DR){if(Math.abs(D.cx-fx)>16*TS||Math.abs(D.cy-fy)>12*TS){D.va=0;continue}
+   let ok=false;const n=D.ns?[0,1]:[1,0];
+   for(const k of D.lf){for(const u of[0,14,DLH]){const bx=k.hx+k.lx*u,by=k.hy+k.ly*u;for(const sd of[-1,1])if(inP(bx+n[0]*sd*(HT+3),by+n[1]*sd*(HT+3))){ok=true;break}if(ok)break}if(ok)break}
+   const a=(D.va||0)+((ok?1:0)-(D.va||0))*fk;D.va=a<.01?0:a;if(D.va<.02)continue;
+   const lv=doorLight(D,fx,fy),bt=Math.max(.26,Math.min(.92,.22+lv.L*.72)),w=Math.ceil(160*S);
+   if(DSC.width!==w){DSC.width=DSC.height=w}
+   dsx.setTransform(1,0,0,1,0,0);dsx.globalCompositeOperation='source-over';dsx.clearRect(0,0,w,w);
+   dsx.setTransform(S,0,0,S,-(D.cx-80)*S,-(D.cy-80)*S);drawDoors(dsx,D);
+   dsx.setTransform(1,0,0,1,0,0);dsx.globalCompositeOperation='source-atop';
+   dsx.fillStyle='rgba(5,8,18,'+(1-bt).toFixed(3)+')';dsx.fillRect(0,0,w,w);
+   dsx.fillStyle='rgba('+lv.c+','+(.09*Math.min(1,lv.L*1.4)).toFixed(3)+')';dsx.fillRect(0,0,w,w);
+   ctx.globalAlpha=D.va;ctx.drawImage(DSC,0,0,w,w,D.cx-80,D.cy-80,160,160)}
   ctx.globalAlpha=1;ctx.restore()}
  /* karakter karanlık/ışık katmanlarının ÜSTÜNE net çizilir */
  if(FOGP<.98){ctx.save();wt();ctx.globalAlpha=1-FOGP;Hero.draw();ctx.restore()}
@@ -1395,7 +1511,8 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/10
  const r=roomAt(pl.x/TS|0,pl.y/TS|0),nm=r?r.n:curRoom;
  if(nm!==curRoom){curRoom=nm;elR.classList.remove('on');rt=.9}
  if(rt>0){rt-=dt;if(rt<=0){elR.textContent=curRoom;elR.classList.add('on')}}
- const ex=Math.hypot(pl.x-54.5*TS,pl.y-15*TS)<TS*2;elH.textContent=ex?'MERDİVEN · KAT 02 (YAKINDA)':'';elH.classList.toggle('on',ex);
+ const ex=Math.hypot(pl.x-54.5*TS,pl.y-15*TS)<TS*2;let lkD=null;if(started)for(const D of DR)if(D.lk&&Math.hypot(D.cx-pl.x,D.cy-pl.y)<TS*1.9){lkD=D;break}
+ const hm=ex?'MERDİVEN · KAT 02 (YAKINDA)':lkD?'KİLİTLİ KAPI · KIRMAK İÇİN ATEŞ ET · HASAR %'+Math.min(99,Math.round((1-lkD.hp/lkD.Y.hp)*100)):'';elH.textContent=hm;elH.classList.toggle('on',!!hm);
 }
 document.getElementById('start').addEventListener('pointerdown',function(){
  started=true;Wpn.reset();Nade.unlock();this.style.opacity=0;setTimeout(()=>this.remove(),1500);

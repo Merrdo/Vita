@@ -288,11 +288,10 @@ DR.forEach(D=>{for(const q of[-1,1]){const X=D.cx+(D.ns?q*30:0),Y=D.cy+(D.ns?0:q
 /* ───────── Oyuncu, girdi ───────── */
 const cv=document.getElementById('c'),ctx=cv.getContext('2d'),LD=3,uc=document.getElementById('u'),uctx=uc.getContext('2d');let UD=1;
 const dk=document.createElement('canvas'),d=dk.getContext('2d'),gl=document.createElement('canvas'),q=gl.getContext('2d'),lt=document.createElement('canvas'),lc=lt.getContext('2d'),dk2=document.createElement('canvas'),d2=dk2.getContext('2d');
-const umc=document.createElement('canvas'),um=umc.getContext('2d'),ovc=document.createElement('canvas'),ov=ovc.getContext('2d'),fgNc=document.createElement('canvas'),fgN=fgNc.getContext('2d'),fgAc=document.createElement('canvas'),fgA=fgAc.getContext('2d'),fgVc=document.createElement('canvas'),fgV=fgVc.getContext('2d');
 const pl={x:4.5*TS,y:14.5*TS,a:0,r:9},keys={},J={m:null,a:null,mouse:null};
 let Z=1,DPR=1,vw=0,vh=0,cam=null;
 function fit(){DPR=Math.min(devicePixelRatio||1,2);vw=innerWidth;vh=innerHeight;cv.width=vw*DPR|0;cv.height=vh*DPR|0;UD=Math.min(devicePixelRatio||1,3);uc.width=vw*UD|0;uc.height=vh*UD|0;
- dk.width=dk2.width=gl.width=lt.width=Math.ceil(cv.width/LD)+2;dk.height=dk2.height=gl.height=lt.height=Math.ceil(cv.height/LD)+2;for(const c of[umc,ovc,fgNc,fgAc,fgVc]){c.width=dk.width;c.height=dk.height}Z=vh/(TS*7.2)}
+ dk.width=dk2.width=gl.width=lt.width=Math.ceil(cv.width/LD)+2;dk.height=dk2.height=gl.height=lt.height=Math.ceil(cv.height/LD)+2;Z=vh/(TS*7.2)}
 addEventListener('resize',fit);fit();
 addEventListener('keydown',e=>{keys[e.code]=1;if(e.code==='KeyQ')Wpn.next();const n=+e.code.replace('Digit','');if(n>=1&&n<=Wpn.list.length)Wpn.select(n-1)});addEventListener('keyup',e=>keys[e.code]=0);
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);Nade.unlock();
@@ -350,17 +349,12 @@ function lightSprite(rgb,al,N){const key=rgb+'|'+al.toFixed(3)+'|'+N;let sp=SPR.
  cx.putImageData(im,0,0);SPR.set(key,sp);return sp}
 
 /* ışık katmanı yumuşatma (görüş çokgeni ve gölge kenarları): aşağı-yukarı örnekleme, ctx.filter gerekmez (iOS'ta da çalışır) */
-const BCS=[],BCU=[];
-function soften(cvs,c,k,BC){BC=BC||BCS;const w=cvs.width,h=cvs.height;if(k<1)return;
+const BC=[];
+function soften(cvs,c,k){const w=cvs.width,h=cvs.height;if(k<1)return;
  for(let i=0;i<k;i++){const cw=Math.max(1,w>>(i+1)),ch=Math.max(1,h>>(i+1));if(!BC[i])BC[i]=document.createElement('canvas');const e=BC[i];if(e.width!==cw||e.height!==ch){e.width=cw;e.height=ch}
   const x=e.getContext('2d');x.imageSmoothingEnabled=true;x.globalCompositeOperation='copy';x.drawImage(i?BC[i-1]:cvs,0,0,cw,ch)}
  for(let i=k-1;i>0;i--){const x=BC[i-1].getContext('2d');x.imageSmoothingEnabled=true;x.globalCompositeOperation='copy';x.drawImage(BC[i],0,0,BC[i-1].width,BC[i-1].height)}
  c.setTransform(1,0,0,1,0,0);c.imageSmoothingEnabled=true;c.globalCompositeOperation='copy';c.drawImage(BC[0],0,0,w,h);c.globalCompositeOperation='source-over'}
-function* softenG(cvs,c,k){const w=cvs.width,h=cvs.height;
- for(let i=0;i<k;i++){const cw=Math.max(1,w>>(i+1)),ch=Math.max(1,h>>(i+1));if(!BCS[i])BCS[i]=document.createElement('canvas');const e=BCS[i];if(e.width!==cw||e.height!==ch){e.width=cw;e.height=ch}
-  const x=e.getContext('2d');x.imageSmoothingEnabled=true;x.globalCompositeOperation='copy';x.drawImage(i?BCS[i-1]:cvs,0,0,cw,ch);yield}
- for(let i=k-1;i>0;i--){const x=BCS[i-1].getContext('2d');x.imageSmoothingEnabled=true;x.globalCompositeOperation='copy';x.drawImage(BCS[i],0,0,BCS[i-1].width,BCS[i-1].height);yield}
- c.setTransform(1,0,0,1,0,0);c.imageSmoothingEnabled=true;c.globalCompositeOperation='copy';c.drawImage(BCS[0],0,0,w,h);c.globalCompositeOperation='source-over'}
 /* ince film greni: kalan 8-bit bantlaşmayı gözden saklar */
 let NP=null;function grain(){const n=document.createElement('canvas');n.width=n.height=128;const x=n.getContext('2d'),im=x.createImageData(128,128);
  for(let i=0;i<128*128;i++){const v=Math.floor(Math.random()*3);im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255}
@@ -395,65 +389,6 @@ function updateRegion(x0,y0,x1,y1){
  dkx.fillStyle='rgba(8,11,28,.80)';dkx.fillRect(x0+MG,y0+MG,x1-x0,y1-y0);
  if(FR){dkx.save();dkx.beginPath();dkx.rect(x0+MG,y0+MG,x1-x0,y1-y0);dkx.clip();dkx.clearRect(FR.x*TS+MG,FR.y*TS+MG,FR.w*TS,FR.h*TS);dkx.fillStyle='rgba(3,4,8,.97)';dkx.fillRect(FR.x*TS+MG,FR.y*TS+MG,FR.w*TS,FR.h*TS);dkx.restore()} /* bu oda: ilk dosyadaki karanlık (rgba(3,4,8,.97)) */
  dkx.globalCompositeOperation='destination-out';dkx.drawImage(BL,x0+MG,y0+MG,x1-x0,y1-y0,x0+MG,y0+MG,x1-x0,y1-y0);dkx.globalCompositeOperation='source-over'}
-
-/* ───────── Kapı ışığı: kademeli pişirme + yumuşak geçiş ─────────
-   Eskiden kapı açılıp kapanınca bölgenin ışığı TEK karede yeniden hesaplanıyordu (40-70 ms): ekran takılıyor, ışık ve gölge aniden beliriyordu.
-   Şimdi iş küçük parçalara bölünüp kareler arasına yayılır; sonuç ayrı dokulara yazılır ve eski → yeni ışık 0.35 sn'de çapraz geçişle gösterilir. */
-const mkR=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
-const RW=Math.ceil(Math.max.apply(null,L.map(l=>l.r))*TS*2)+4,FSETS=[0,1].map(()=>({busy:0,o:[0,1,2].map(()=>mkR(RW,RW)),n:[0,1,2].map(()=>mkR(RW,RW))}));
-const JOBS=[];let FADE=null;
-function* bakeG(D,st,set){
- /* 1) lamba görüş çokgenleri (yeni kapı durumuna göre), 2'şer lamba */
- const idx=[];for(let i=0;i<L.length;i++){const l=L[i];if(Math.hypot(l.x*TS-D.cx,l.y*TS-D.cy)<l.r*TS+72)idx.push(i)}
- for(let k=0;k<idx.length;k+=2){const keep=SEG;SEG=lightSegs();
-  for(const i of idx.slice(k,k+2)){LPS[i]=lampPolys(L[i]);LP[i]=LPS[i][0][0]}
-  SEG=keep;yield}
- /* 2) bölge: ışık dokularına (UL/UG) lambaları çiz */
- const m=L.reduce((a,l)=>Math.max(a,l.r),0)*TS;
- let x0=Math.max(-MG,Math.floor(D.cx-m)),y0=Math.max(-MG,Math.floor(D.cy-m)),x1=Math.min(W*TS+MG,Math.ceil(D.cx+m)),y1=Math.min(H*TS+MG,Math.ceil(D.cy+m));
- const ex0=Math.max(-MG,x0-LB),ey0=Math.max(-MG,y0-LB),ex1=Math.min(W*TS+MG,x1+LB),ey1=Math.min(H*TS+MG,y1+LB),bw=ex1-ex0,bh=ey1-ey0,rw=x1-x0,rh=y1-y0;
- st.x0=x0;st.y0=y0;st.w=rw;st.h=rh;
- for(const c of[ulx,ugx]){c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.globalAlpha=1;c.clearRect(ex0+MG,ey0+MG,bw,bh)}
- yield;
- let n=0;
- for(let i=0;i<L.length;i++){const l=L[i];if(!l.on)continue;const lx=l.x*TS,ly=l.y*TS,Rr=l.r*TS;if(lx+Rr<ex0||lx-Rr>ex1||ly+Rr<ey0||ly-Rr>ey1)continue;
-  const N=Math.ceil(Rr*2),sx=Math.round(lx-Rr)+MG,sy=Math.round(ly-Rr)+MG;
-  for(const sm of LPS[i]){
-   ulx.save();ulx.setTransform(1,0,0,1,MG,MG);ulx.beginPath();ulx.rect(ex0,ey0,bw,bh);ulx.clip();path(ulx,sm[0]);ulx.clip();
-   ulx.fillStyle=fall(ulx,lx,ly,Rr,'255,255,255',Math.min(1,l.al*sm[1]));ulx.fillRect(lx-Rr,ly-Rr,Rr*2,Rr*2);ulx.restore();
-   ugx.save();ugx.setTransform(1,0,0,1,MG,MG);ugx.beginPath();ugx.rect(ex0,ey0,bw,bh);ugx.clip();path(ugx,sm[0]);ugx.clip();
-   ugx.setTransform(1,0,0,1,0,0);ugx.globalCompositeOperation='lighter';ugx.drawImage(lightSprite(l.c,Math.min(1,l.aq*sm[1]),N),sx,sy);ugx.restore()}
-  if(++n%2===0)yield}
- {ulx.save();ulx.setTransform(1,0,0,1,MG,MG);ulx.beginPath();ulx.rect(ex0,ey0,bw,bh);ulx.clip();ulx.fillStyle='rgba(255,255,255,.88)';ulx.fillRect(TS,0,10*TS,3*TS);ulx.fillStyle='#fff';ulx.fillRect(2*TS,3*TS,8*TS,7*TS);ulx.restore()}
- yield;
- /* 3) bulanıklaştır → yeni dokular (bölge boyunda) */
- if(TMP.width!==bw||TMP.height!==bh){TMP.width=bw;TMP.height=bh}
- for(let a=0;a<2;a++){const U=a?UG:UL;
-  tmx.setTransform(1,0,0,1,0,0);tmx.globalCompositeOperation='copy';tmx.drawImage(U,ex0+MG,ey0+MG,bw,bh,0,0,bw,bh);yield;yield* softenG(TMP,tmx,4);
-  const o=set.n[a].getContext('2d');o.setTransform(1,0,0,1,0,0);o.globalCompositeOperation='source-over';o.globalAlpha=1;o.clearRect(0,0,RW,RW);o.drawImage(TMP,x0-ex0,y0-ey0,rw,rh,0,0,rw,rh);yield}
- /* 4) karanlık katmanı */
- {const o=set.n[2].getContext('2d');o.setTransform(1,0,0,1,0,0);o.globalCompositeOperation='source-over';o.globalAlpha=1;o.clearRect(0,0,RW,RW);
-  o.fillStyle='rgba(8,11,28,.80)';o.fillRect(0,0,rw,rh);
-  if(FR){o.save();o.beginPath();o.rect(0,0,rw,rh);o.clip();const fx=FR.x*TS-x0,fy=FR.y*TS-y0;o.clearRect(fx,fy,FR.w*TS,FR.h*TS);o.fillStyle='rgba(3,4,8,.97)';o.fillRect(fx,fy,FR.w*TS,FR.h*TS);o.restore()}
-  o.globalCompositeOperation='destination-out';o.drawImage(set.n[0],0,0);o.globalCompositeOperation='source-over'}
-}
-const TEXS=()=>[[blx,BL],[bgx,BG],[dkx,DKc]];
-function fadeApply(F,v){const R=F.st;
- TEXS().forEach(([c,T],i)=>{c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(R.x0+MG,R.y0+MG,R.w,R.h);
-  c.globalAlpha=1-v;c.drawImage(F.set.o[i],0,0,R.w,R.h,R.x0+MG,R.y0+MG,R.w,R.h);
-  c.globalCompositeOperation='lighter';c.globalAlpha=v;c.drawImage(F.set.n[i],0,0,R.w,R.h,R.x0+MG,R.y0+MG,R.w,R.h);
-  c.globalAlpha=1;c.globalCompositeOperation='source-over'})}
-function fadeEnd(){if(!FADE)return;fadeApply(FADE,1);FADE.set.busy=0;FADE=null}
-function startFade(J){fadeEnd();const R=J.st,set=J.set;
- /* eski görüntü = dokuların şu anki hali */
- TEXS().forEach(([c,T],i)=>{const o=set.o[i].getContext('2d');o.setTransform(1,0,0,1,0,0);o.globalCompositeOperation='source-over';o.globalAlpha=1;o.clearRect(0,0,RW,RW);o.drawImage(T,R.x0+MG,R.y0+MG,R.w,R.h,0,0,R.w,R.h)});
- FADE={st:R,set:set,t:0};fadeApply(FADE,0)}
-function jobsTick(dt,ms){
- if(FADE){FADE.t+=dt/.35;const t=Math.min(1,FADE.t);fadeApply(FADE,t*t*(3-2*t));if(FADE.t>=1)fadeEnd()}
- const t0=performance.now();
- while(JOBS.length&&performance.now()-t0<ms){const J=JOBS[0];
-  if(!J.g){J.started=1;J.set=FSETS.find(x=>!x.busy);if(!J.set)break;J.set.busy=1;J.st={};J.g=bakeG(J.D,J.st,J.set)}
-  if(J.g.next().done){JOBS.shift();startFade(J)}}}
 /* ───────── Lamba çalışma zamanı ───────── */
 const SH=[],SP=[];
 function lampHit(ox,oy,a,dm){const dx=Math.cos(a),dy=Math.sin(a);let b=null,bt=1e9;
@@ -546,7 +481,9 @@ let pvx=0,pvy=0,ppx=null,ppy=0;
 const segDist=(px,py,x1,y1,x2,y2)=>{const ex=x2-x1,ey=y2-y1,l2=ex*ex+ey*ey;let t=l2?((px-x1)*ex+(py-y1)*ey)/l2:0;t=t<0?0:t>1?1:t;return Math.hypot(px-x1-ex*t,py-y1-ey*t)};
 function dHit(x,y){const R=pl.r+HT-1;for(const D of DR){if(Math.abs(x-D.cx)>80||Math.abs(y-D.cy)>80)continue;
  for(let i=0;i<D.sg.length;i+=4){const dn=segDist(x,y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3]);if(dn<R&&(dn<segDist(pl.x,pl.y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3])-.01||segDist(pl.x,pl.y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3])>=R))return true}}return false}
-function relight(D){if(JOBS.some(j=>j.D===D&&!j.started))return;JOBS.push({D:D,started:0,g:null})}
+function relight(D){const keep=SEG;SEG=lightSegs();
+ for(let i=0;i<L.length;i++){const l=L[i];if(Math.hypot(l.x*TS-D.cx,l.y*TS-D.cy)<l.r*TS+72){LPS[i]=lampPolys(l);LP[i]=LPS[i][0][0]}}
+ SEG=keep;const m=L.reduce((a,l)=>Math.max(a,l.r),0)*TS;updateRegion(D.cx-m,D.cy-m,D.cx+m,D.cy+m)}
 function doorsUpdate(dt){
  if(ppx===null){ppx=pl.x;ppy=pl.y}
  if(dt>0){const k=Math.min(1,dt*20);pvx+=((pl.x-ppx)/dt-pvx)*k;pvy+=((pl.y-ppy)/dt-pvy)*k}ppx=pl.x;ppy=pl.y;
@@ -557,8 +494,7 @@ function doorsUpdate(dt){
   else if(D.t&&!(Math.abs(pp)<42&&ax*D.s<44&&ax*D.s>-66))D.t=0;
   const pr=D.p;D.p=D.t?Math.min(1,D.p+dt/.28):Math.max(0,D.p-dt/.5);
   if(D.p!==pr||(D.p===0&&D.t))dgeo(D);
-  if(D.t&&D.p>0&&D.lc===1){D.lc=0;relight(D)}                /* açılmaya başladı: açık aydınlatmayı hazırla */
-  else if(!D.t&&D.lc===0&&D.p<pr){D.lc=1;relight(D)}}         /* kapanmaya başladı: kapalı aydınlatmayı hazırla */
+  if(pr===0&&D.p>0){D.lc=0;relight(D)}else if(pr>0&&D.p===0){D.lc=1;relight(D)}}
  SEG=[];for(const D of DR){if(D.p>=.999||Math.abs(D.cx-pl.x)>20*TS||Math.abs(D.cy-pl.y)>20*TS)continue;for(const v of D.sg)SEG.push(v)}}
 function drawDoors(c){c.save();c.lineJoin='round';
  for(const D of DR)for(const k of D.lf){const X=(u,v)=>k.hx+k.lx*u+k.vx*v,Y=(u,v)=>k.hy+k.ly*u+k.vy*v;
@@ -1379,57 +1315,6 @@ function move(dt){
  const ad=J.a?Math.hypot(J.a.x-J.a.x0,J.a.y-J.a.y0):0;
  Hero.update(dt,{v:SPD,mx:mx,my:my,m:m,aim:ad>8||!!J.md||Nade.wind,fire:Wpn.cur().id!=='bomb'&&Wpn.cur().id!=='glow'&&(ad>=52||!!J.md)});
 }
-
-/* ───────── SİS (SİSLİ ODA) ─────────
-   Gerçek hacimsel sis: dünyaya sabit, yavaşça sürüklenen iki katman bulut dokusu.
-   · saçılan ışık: lamba/el feneri/namlu ışığı sisin içinde renkli bir parıltı verir (ışık yoksa sis neredeyse görünmez)
-   · uzaklık perdesi: oyuncudan uzaklaştıkça sis yoğunlaşır, uzaktaki şeyler sisin içinde kaybolur
-   · oyuncu sisi yarar: etrafında boşluk açar ve yürüdüğü yerde kısa bir iz bırakır
-   · kapı açılınca sis komşu odaya taşar */
-function mkFogTex(N,sd){const c=document.createElement('canvas');c.width=c.height=N;const x=c.getContext('2d'),im=x.createImageData(N,N),D=im.data;
- const Hh=(i,j,p,k)=>hsh(((i%p)+p)%p,((j%p)+p)%p,k+sd*13),sm=t=>t*t*(3-2*t),oct=[[4,.52],[8,.27],[16,.14],[32,.07]];
- for(let y=0;y<N;y++)for(let xx=0;xx<N;xx++){let v=0;
-  for(let o=0;o<4;o++){const pp=oct[o][0],fx=xx/N*pp,fy=y/N*pp,i=Math.floor(fx),j=Math.floor(fy),tx=sm(fx-i),ty=sm(fy-j),
-   a=Hh(i,j,pp,o),b=Hh(i+1,j,pp,o),c2=Hh(i,j+1,pp,o),e2=Hh(i+1,j+1,pp,o);
-   v+=oct[o][1]*((a+(b-a)*tx)*(1-ty)+(c2+(e2-c2)*tx)*ty)}
-  let t=(v-.40)/.30;t=t<0?0:t>1?1:t;t=t*t*(3-2*t);
-  const o4=(y*N+xx)*4;D[o4]=D[o4+1]=D[o4+2]=255;D[o4+3]=t*255|0}
- x.putImageData(im,0,0);return c}
-const FOGT=[mkFogTex(128,3),mkFogTex(128,9)],FOGPT=FOGT.map(t=>fgN.createPattern(t,'repeat')),FTR=[],FDOOR=DR.find(D=>Math.abs(D.cx-47.5*TS)<3&&Math.abs(D.cy-25*TS)<3);
-let FTM=0;
-function fogPass(dt,camx,camy,ls,qx,qy,qw,qh,flv){
- if(!FR)return;const X=FR.x*TS,Y=FR.y*TS,A=FR.w*TS,B=FR.h*TS,SP=3*TS,sp=FDOOR?FDOOR.p:0;
- if(X+A<camx||X-SP>camx+vw/Z||Y+B<camy||Y>camy+vh/Z){FTR.length=0;return}
- const w=fgNc.width,h=fgNc.height,tw=cv.width/LD,th=cv.height/LD,I=(a,b)=>a.setTransform(1,0,0,1,0,0);
- FTM+=dt;
- /* iz: oyuncu gittiği yerde sisi açar, iz yavaşça kapanır */
- {const t=FTR[FTR.length-1];if(!t||Math.hypot(pl.x-t.x,pl.y-t.y)>7)FTR.push({x:pl.x,y:pl.y,a:1});for(const q of FTR)q.a-=dt*.75;while(FTR.length&&FTR[0].a<=0)FTR.shift()}
- /* 1) bulut maskesi */
- fgN.setTransform(1,0,0,1,0,0);fgN.globalCompositeOperation='source-over';fgN.globalAlpha=1;fgN.clearRect(0,0,w,h);
- fgN.setTransform(ls,0,0,ls,-camx*ls,-camy*ls);fgN.imageSmoothingEnabled=true;
- const cloud=(x0,y0,w0,h0)=>{for(let k=0;k<2;k++){const sz=k?105:160,vx=k?-5:7,vy=k?4:-3,ox=FTM*vx+Math.sin(FTM*.23+k)*14,oy=FTM*vy+Math.cos(FTM*.19+k*2)*10;
-   FOGPT[k].setTransform(new DOMMatrix([sz/128,0,0,sz/128,ox,oy]));fgN.globalAlpha=k?.8:1;fgN.fillStyle=FOGPT[k];fgN.fillRect(x0,y0,w0,h0)}fgN.globalAlpha=1};
- fgN.save();fgN.beginPath();fgN.rect(X,Y,A,B);fgN.clip();cloud(X,Y,A,B);fgN.restore();
- if(sp>.02){fgN.save();fgN.beginPath();fgN.rect(X-SP,24*TS,SP,2*TS);fgN.clip();fgN.globalAlpha=sp;cloud(X-SP,24*TS,SP,2*TS);fgN.globalAlpha=1;
-  const g=fgN.createLinearGradient(X,0,X-SP,0);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,1)');fgN.globalCompositeOperation='destination-out';fgN.fillStyle=g;fgN.fillRect(X-SP,24*TS,SP,2*TS);fgN.restore()}
- /* oyuncu ve izi sisi yarar */
- fgN.globalCompositeOperation='destination-out';const hole=fallSprite('0,0,0');
- for(const q of FTR){const r=26+10*q.a;fgN.globalAlpha=Math.min(1,.65*q.a);fgN.drawImage(hole,q.x-r,q.y-r,r*2,r*2)}
- fgN.globalAlpha=.9;fgN.drawImage(hole,pl.x-38,pl.y-38,76,76);fgN.globalAlpha=1;fgN.globalCompositeOperation='source-over';
- /* 2) saçılan ışık: lamba + el feneri/namlu ışığı, sis bulutlarıyla çarpılır */
- I(fgA);fgA.globalCompositeOperation='source-over';fgA.globalAlpha=1;fgA.clearRect(0,0,w,h);
- fgA.globalAlpha=.55;fgA.drawImage(BG,qx,qy,qw,qh,0,0,tw,th);fgA.globalCompositeOperation='lighter';
- if(flv){fgA.globalAlpha=.7;fgA.drawImage(lt,0,0,tw,th,0,0,tw,th)}
- fgA.globalAlpha=1;fgA.fillStyle='rgb(9,19,18)';fgA.fillRect(0,0,w,h);
- fgA.globalCompositeOperation='destination-in';fgA.drawImage(fgNc,0,0);fgA.globalCompositeOperation='source-over';
- /* 3) uzaklık perdesi */
- fgV.setTransform(1,0,0,1,0,0);fgV.globalCompositeOperation='source-over';fgV.clearRect(0,0,w,h);
- fgV.setTransform(ls,0,0,ls,-camx*ls,-camy*ls);{const R2=14*TS,g=fgV.createRadialGradient(pl.x,pl.y,TS*1.1,pl.x,pl.y,R2);g.addColorStop(0,'rgba(46,76,70,0)');g.addColorStop(.42,'rgba(40,66,62,.5)');g.addColorStop(1,'rgba(40,66,62,.62)');fgV.fillStyle=g;fgV.fillRect(X-SP,Y,A+SP,B)}
- I(fgV);fgV.globalCompositeOperation='destination-in';fgV.drawImage(fgNc,0,0);fgV.globalCompositeOperation='source-over';
- /* 4) ekrana */
- ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='source-over';ctx.drawImage(fgVc,0,0,tw,th,0,0,cv.width,cv.height);
- ctx.globalCompositeOperation='lighter';ctx.drawImage(fgAc,0,0,tw,th,0,0,cv.width,cv.height);ctx.globalCompositeOperation='source-over'}
-
 function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/1000||0,.05);last=now;TT=now/1000;VW=vw;VH=vh;
  if(started)move(dt);doorsUpdate(dt);if(started)Wpn.update(dt);Nade.update(dt);lampUpdate(dt);
  const tx=pl.x+Hero.lx+Nade.lx-vw/2/Z,ty=pl.y+Hero.ly+Nade.ly-vh/2/Z;if(!cam)cam={x:tx,y:ty};const k=Math.min(1,dt*7);cam.x+=(tx-cam.x)*k;cam.y+=(ty-cam.y)*k;
@@ -1443,8 +1328,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/10
  // ışık: lambalar önce birikir, sonra oyuncunun görüş çokgeniyle kesilir (duvar ardı hiç aydınlanmaz)
  const ls=S/LD,tox=Math.floor(camx*ls),toy=Math.floor(camy*ls),sfx=camx*ls-tox,sfy=camy*ls-toy,tf=c=>c.setTransform(ls,0,0,ls,-tox,-toy),fx=pl.x,fy=pl.y;
  if(!lcReady){updateRegion(-MG,-MG,W*TS+MG,H*TS+MG);lcReady=true}
- jobsTick(dt,3.5);
- while(LDIRTY.length&&!JOBS.length&&!FADE){const l=LDIRTY.pop(),R0=l.r*TS;updateRegion(l.x*TS-R0,l.y*TS-R0,l.x*TS+R0,l.y*TS+R0)}
+ while(LDIRTY.length){const l=LDIRTY.pop(),R0=l.r*TS;updateRegion(l.x*TS-R0,l.y*TS-R0,l.x*TS+R0,l.y*TS+R0)}
  const vx0=camx-300,vx1=camx+vw/Z+300,vy0=camy-300,vy1=camy+vh/Z+300;
  const pv=vis(fx,fy,15*TS,0,Math.PI);
  // hafıza: girdiğin odalar çok soluk silüet olarak kalır
@@ -1473,7 +1357,8 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/10
  L.forEach((l,i)=>{if(l.on||l.i<.02)return;const lx=l.x*TS,ly=l.y*TS,Rr=l.r*TS;if(lx<vx0||lx>vx1||ly<vy0||ly>vy1)return;  /* kırılıp titreyen lambalar */
   for(const sm of LPS[i]){ctx.save();path(ctx,sm[0]);ctx.clip();ctx.fillStyle=fall(ctx,lx,ly,Rr,l.c,Math.min(1,(l.aq+.1)*Math.min(1.15,l.i)*sm[1]));ctx.fillRect(lx-Rr,ly-Rr,Rr*2,Rr*2);ctx.restore()}});
  ctx.globalCompositeOperation='source-over';
- fogPass(dt,camx,camy,ls,qx,qy,qw,qh,flv);wt();
+ /* oyuncunun çevresindeki yumuşak koyu halka: aynı görüş çokgeni içinde olduğundan ayrı kırpma gerekmez */
+ if(FOGP>.01){const hh=hR;ctx.fillStyle=fall(ctx,fx,fy,hh,'0,0,0',.6*FOGP);ctx.fillRect(fx-hh,fy-hh,hh*2,hh*2)}
  dv();ctx.globalCompositeOperation='lighter';ctx.fillStyle=NP;ctx.fillRect(0,0,cv.width,cv.height);ctx.globalCompositeOperation='source-over';
  ctx.restore();
  /* GÖRÜNMEYEN ALAN: düz karanlık + girilmiş odaların çok soluk silüeti */
@@ -1498,7 +1383,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/10
    ctx.globalAlpha=TALLA[i];ctx.drawImage(sc,(X-1)*SS,(Y-1)*SS,(A+3)*SS,(B+3)*SS,X-1,Y-1,A+3,B+3);ctx.fillStyle='rgba(2,3,7,'+al+')';ctx.fillRect(X-1,Y-1,A+3,B+3)}
   ctx.globalAlpha=1;ctx.restore()}
  /* karakter karanlık/ışık katmanlarının ÜSTÜNE net çizilir */
- if(FOGP<.98){ctx.save();wt();ctx.globalAlpha=1-FOGP*.55;Hero.draw();ctx.restore()}
+ if(FOGP<.98){ctx.save();wt();ctx.globalAlpha=1-FOGP;Hero.draw();ctx.restore()}
  ctx.setTransform(S,0,0,S,-camx*S,-camy*S);Hero.fx(ctx,pv);lampFx(ctx,pv);sunFx(ctx,pv);doorFx(ctx,pv);Nade.fx(ctx,pv);ctx.setTransform(1,0,0,1,0,0);
  // vinyet
  const vg=ctx.createRadialGradient(cv.width/2,cv.height/2,cv.height*.4,cv.width/2,cv.height/2,cv.width*.65);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,'+(.38+.22*FOGP)+')');ctx.fillStyle=vg;ctx.fillRect(0,0,cv.width,cv.height);

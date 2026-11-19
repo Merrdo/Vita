@@ -524,7 +524,7 @@ function dHit(x,y){const R=pl.r+HT-1;for(const D of DR){if(Math.abs(x-D.cx)>80||
  for(let i=0;i<D.sg.length;i+=4){const dn=segDist(x,y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3]);if(dn<R&&(dn<segDist(pl.x,pl.y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3])-.01||segDist(pl.x,pl.y,D.sg[i],D.sg[i+1],D.sg[i+2],D.sg[i+3])>=R))return true}}return false}
 /* Işık yeniden pişirme: kapı açılıp kapanınca (ya da lamba kırılınca) ışık dokusu tek karede değil, karelere yayılarak güncellenir.
    Kapıya en yakın karolar önce yenilenir → ışık kapıdan dışarı doğru akar, takılma olmaz. */
-const RQ=new Map(),RTS=96,PLQ=new Set();let RQx=0,RQy=0;
+const RQ=new Map(),RTS=192,PLQ=new Set(); /* 96→192: küçük karolar blur payı yüzünden ~3.7x fazla piksel çiziyordu; lamba kırılınca ~25 karo yerine ~9 karo */let RQx=0,RQy=0;
 function queueRegion(x0,y0,x1,y1,fx,fy){RQx=fx;RQy=fy;
  for(let ty=Math.floor(y0/RTS);ty<=Math.floor(y1/RTS);ty++)for(let tx=Math.floor(x0/RTS);tx<=Math.floor(x1/RTS);tx++)RQ.set(tx+','+ty,[tx*RTS,ty*RTS])}
 const inPoly=(p,x,y)=>{let c=false;for(let i=0,j=p.length-2;i<p.length;i+=2){const xi=p[i],yi=p[i+1],xj=p[j],yj=p[j+1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;j=i}return c};
@@ -541,7 +541,7 @@ function lightPump(){
  if(PLQ.size){const keep=SEG;SEG=lightSegs();
   for(const i of PLQ){PLQ.delete(i);const l=L[i],o=LP[i];LPS[i]=lampPolys(l);LP[i]=LPS[i][0][0];diffTiles(l,o,LP[i]);if(performance.now()-t0>1.5)break}
   SEG=keep;if(PLQ.size)return}
- let n=0;while(RQ.size&&(n===0||performance.now()-t0<3.5)){let bk=null,bd=1e18;
+ let n=0;while(RQ.size&&(n===0||performance.now()-t0<2)){let bk=null,bd=1e18;
   for(const[k,v]of RQ){const d=Math.hypot(v[0]+RTS/2-RQx,v[1]+RTS/2-RQy);if(d<bd){bd=d;bk=k}}
   const v=RQ.get(bk);RQ.delete(bk);updateRegion(v[0],v[1],v[0]+RTS,v[1]+RTS);n++}}
 function doorsUpdate(dt){

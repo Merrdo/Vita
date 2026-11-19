@@ -432,10 +432,19 @@ function updateRegion(x0,y0,x1,y1){
  dkx.globalCompositeOperation='destination-out';dkx.drawImage(BL,x0+MG,y0+MG,x1-x0,y1-y0,x0+MG,y0+MG,x1-x0,y1-y0);dkx.globalCompositeOperation='source-over'}
 /* Lamba kırılınca bölgeyi yeniden pişirmek yerine lambanın kendi ışığı dokulardan ucuzca SİLİNİR:
    karanlık maskesine aynı sönümle karanlık geri eklenir, renkli katmandan aynı sprite çıkarılır. */
-function lampErase(l){const i=l.id,lx=l.x*TS,ly=l.y*TS,Rr=l.r*TS,N=Math.ceil(Rr*2),sx=Math.round(lx-Rr)+MG,sy=Math.round(ly-Rr)+MG;
- for(const sm of LPS[i]){
-  dkx.save();dkx.setTransform(1,0,0,1,MG,MG);path(dkx,sm[0]);dkx.clip();dkx.globalCompositeOperation='lighter';dkx.fillStyle=fall(dkx,lx,ly,Rr,'8,11,28',.8*Math.min(1,l.al*sm[1]));dkx.fillRect(lx-Rr,ly-Rr,Rr*2,Rr*2);dkx.restore();
-  bgx.save();bgx.setTransform(1,0,0,1,MG,MG);path(bgx,sm[0]);bgx.clip();bgx.setTransform(1,0,0,1,0,0);bgx.globalCompositeOperation='difference';bgx.drawImage(lightSprite(l.c,Math.min(1,l.aq*sm[1]),N),sx,sy);bgx.restore()}}
+const TE=document.createElement('canvas'),tex=TE.getContext('2d');
+function lampErase(l){const i=l.id,lx=l.x*TS,ly=l.y*TS,Rr=l.r*TS,N=Math.ceil(Rr*2),M=Math.ceil((N+96)/16)*16,off=(M-N)>>1,sx0=Math.round(lx-Rr),sy0=Math.round(ly-Rr),wx0=sx0-off,wy0=sy0-off;
+ if(TE.width!==M){TE.width=TE.height=M}
+ /* 1) renkli katman: lambanın sprite'ı, orijinal pişirmedeki gibi çokgene kırpılıp bulanıklaştırılır, sonra çıkarılır */
+ tex.setTransform(1,0,0,1,0,0);tex.globalCompositeOperation='source-over';tex.globalAlpha=1;tex.clearRect(0,0,M,M);
+ for(const sm of LPS[i]){tex.save();tex.setTransform(1,0,0,1,-wx0,-wy0);path(tex,sm[0]);tex.clip();tex.setTransform(1,0,0,1,0,0);tex.globalCompositeOperation='lighter';tex.drawImage(lightSprite(l.c,Math.min(1,l.aq*sm[1]),N),sx0-wx0,sy0-wy0);tex.restore()}
+ soften(TE,tex,4);
+ bgx.save();bgx.setTransform(1,0,0,1,0,0);bgx.globalCompositeOperation='difference';bgx.drawImage(TE,wx0+MG,wy0+MG);bgx.restore();
+ /* 2) karanlık maskesi: lambanın açtığı delik aynı şekilde bulanıklaştırılıp karanlık olarak geri eklenir */
+ tex.setTransform(1,0,0,1,0,0);tex.globalCompositeOperation='source-over';tex.clearRect(0,0,M,M);
+ for(const sm of LPS[i]){tex.save();tex.setTransform(1,0,0,1,-wx0,-wy0);path(tex,sm[0]);tex.clip();tex.globalCompositeOperation='lighter';tex.fillStyle=fall(tex,lx,ly,Rr,'8,11,28',.8*Math.min(1,l.al*sm[1]));tex.fillRect(lx-Rr,ly-Rr,Rr*2,Rr*2);tex.restore()}
+ soften(TE,tex,4);
+ dkx.save();dkx.setTransform(1,0,0,1,0,0);dkx.globalCompositeOperation='lighter';dkx.drawImage(TE,wx0+MG,wy0+MG);dkx.restore()}
 /* ───────── Lamba çalışma zamanı ───────── */
 const SH=[],SP=[];
 function lampHit(ox,oy,a,dm){const dx=Math.cos(a),dy=Math.sin(a);let b=null,bt=1e9;

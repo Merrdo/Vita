@@ -430,6 +430,12 @@ function updateRegion(x0,y0,x1,y1){
  dkx.fillStyle='rgba(8,11,28,.80)';dkx.fillRect(x0+MG,y0+MG,x1-x0,y1-y0);
  if(FR){dkx.save();dkx.beginPath();dkx.rect(x0+MG,y0+MG,x1-x0,y1-y0);dkx.clip();dkx.clearRect(FR.x*TS+MG,FR.y*TS+MG,FR.w*TS,FR.h*TS);dkx.fillStyle='rgba(3,4,8,.97)';dkx.fillRect(FR.x*TS+MG,FR.y*TS+MG,FR.w*TS,FR.h*TS);dkx.restore()} /* bu oda: ilk dosyadaki karanlık (rgba(3,4,8,.97)) */
  dkx.globalCompositeOperation='destination-out';dkx.drawImage(BL,x0+MG,y0+MG,x1-x0,y1-y0,x0+MG,y0+MG,x1-x0,y1-y0);dkx.globalCompositeOperation='source-over'}
+/* Lamba kırılınca bölgeyi yeniden pişirmek yerine lambanın kendi ışığı dokulardan ucuzca SİLİNİR:
+   karanlık maskesine aynı sönümle karanlık geri eklenir, renkli katmandan aynı sprite çıkarılır. */
+function lampErase(l){const i=l.id,lx=l.x*TS,ly=l.y*TS,Rr=l.r*TS,N=Math.ceil(Rr*2),sx=Math.round(lx-Rr)+MG,sy=Math.round(ly-Rr)+MG;
+ for(const sm of LPS[i]){
+  dkx.save();dkx.setTransform(1,0,0,1,MG,MG);path(dkx,sm[0]);dkx.clip();dkx.globalCompositeOperation='lighter';dkx.fillStyle=fall(dkx,lx,ly,Rr,'8,11,28',.8*Math.min(1,l.al*sm[1]));dkx.fillRect(lx-Rr,ly-Rr,Rr*2,Rr*2);dkx.restore();
+  bgx.save();bgx.setTransform(1,0,0,1,MG,MG);path(bgx,sm[0]);bgx.clip();bgx.setTransform(1,0,0,1,0,0);bgx.globalCompositeOperation='difference';bgx.drawImage(lightSprite(l.c,Math.min(1,l.aq*sm[1]),N),sx,sy);bgx.restore()}}
 /* ───────── Lamba çalışma zamanı ───────── */
 const SH=[],SP=[];
 function lampHit(ox,oy,a,dm){const dx=Math.cos(a),dy=Math.sin(a);let b=null,bt=1e9;
@@ -1431,7 +1437,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/10
  // ışık: lambalar önce birikir, sonra oyuncunun görüş çokgeniyle kesilir (duvar ardı hiç aydınlanmaz)
  const ls=S/LD,tox=Math.floor(camx*ls),toy=Math.floor(camy*ls),sfx=camx*ls-tox,sfy=camy*ls-toy,tf=c=>c.setTransform(ls,0,0,ls,-tox,-toy),fx=pl.x,fy=pl.y;
  if(!lcReady){updateRegion(-MG,-MG,W*TS+MG,H*TS+MG);lcReady=true}
- while(LDIRTY.length){const l=LDIRTY.pop(),R0=l.r*TS;queueRegion(l.x*TS-R0,l.y*TS-R0,l.x*TS+R0,l.y*TS+R0,l.x*TS,l.y*TS)}lightPump();
+ while(LDIRTY.length)lampErase(LDIRTY.pop());lightPump();
  const vx0=camx-300,vx1=camx+vw/Z+300,vy0=camy-300,vy1=camy+vh/Z+300;
  const pv=vis(fx,fy,15*TS,0,Math.PI);
  // hafıza: girdiğin odalar çok soluk silüet olarak kalır
